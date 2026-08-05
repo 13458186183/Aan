@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FieldKit - 一站式 Web 工具箱</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- ============================================================ -->
+    <!-- 顶部导航 -->
+    <!-- ============================================================ -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">&#9874;</span>
+                <span class="logo-text">FieldKit</span>
+                <span class="logo-badge">工具箱</span>
+            </div>
+            <nav class="nav-links">
+                <a href="/docs" target="_blank" class="nav-link">API 文档</a>
+                <a href="/api/health" target="_blank" class="nav-link">健康检查</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ============================================================ -->
+    <!-- 主体内容 -->
+    <!-- ============================================================ -->
+    <main class="main-container">
+
+        <!-- 欢迎区域 -->
+        <section class="hero">
+            <h1 class="hero-title">一站式 Web 工具箱</h1>
+            <p class="hero-desc">
+                图片处理 &middot; 考勤点名 &middot; 测绘水印 &middot; 资产清查 &middot; 拼豆图纸
+            </p>
+        </section>
+
+        <!-- 工具卡片网格 -->
+        <section class="tool-grid">
+
+            <!-- 1. 图片处理工具 -->
+            <div class="tool-card" data-tool="image">
+                <div class="card-icon icon-image">&#128247;</div>
+                <h3 class="card-title">图片处理工具</h3>
+                <p class="card-desc">
+                    批量缩放、裁剪、压缩、格式转换、添加水印，支持多图上传并打包 zip 下载。
+                </p>
+                <ul class="card-features">
+                    <li>支持 JPG / PNG / WebP / BMP / TIFF</li>
+                    <li>自定义尺寸、质量、输出格式</li>
+                    <li>文字/图片水印叠加</li>
+                </ul>
+                <a href="/static/pages/image-tool.html" class="card-btn">进入工具 &rarr;</a>
+            </div>
+
+            <!-- 2. 考勤点名工具 -->
+            <div class="tool-card" data-tool="attendance">
+                <div class="card-icon icon-attendance">&#128203;</div>
+                <h3 class="card-title">考勤点名工具</h3>
+                <p class="card-desc">
+                    上传花名册 Excel + 活动合照，自动识别人员并导出考勤结果报告。
+                </p>
+                <ul class="card-features">
+                    <li>支持 xlsx 花名册解析</li>
+                    <li>人脸识别自动匹配</li>
+                    <li>导出考勤汇总表与详情</li>
+                </ul>
+                <a href="/static/pages/attendance-tool.html" class="card-btn">进入工具 &rarr;</a>
+            </div>
+
+            <!-- 3. 测绘 EXIF 水印工具 -->
+            <div class="tool-card" data-tool="survey">
+                <div class="card-icon icon-survey">&#127758;</div>
+                <h3 class="card-title">测绘 EXIF 水印工具</h3>
+                <p class="card-desc">
+                    批量给照片写入 GPS 经纬度、拍摄时间、设备信息等 EXIF 元数据。
+                </p>
+                <ul class="card-features">
+                    <li>GPS 经纬度嵌入（度分秒）</li>
+                    <li>自定义拍摄时间、相机型号</li>
+                    <li>支持 JPG / TIFF 格式</li>
+                </ul>
+                <a href="/static/pages/survey-tool.html" class="card-btn">进入工具 &rarr;</a>
+            </div>
+
+            <!-- 4. 村级资产清查表工具 -->
+            <div class="tool-card" data-tool="asset">
+                <div class="card-icon icon-asset">&#128202;</div>
+                <h3 class="card-title">村级资产清查表工具</h3>
+                <p class="card-desc">
+                    下载标准模板、上传填报数据、自动校验汇总，快速完成资产清查工作。
+                </p>
+                <ul class="card-features">
+                    <li>标准 xlsx 模板下载</li>
+                    <li>数据校验与错误提示</li>
+                    <li>汇总导出与统计报表</li>
+                </ul>
+                <a href="/static/pages/asset-tool.html" class="card-btn">进入工具 &rarr;</a>
+            </div>
+
+            <!-- 5. 拼豆图纸转换工具 -->
+            <div class="tool-card" data-tool="bead">
+                <div class="card-icon icon-bead">&#129303;</div>
+                <h3 class="card-title">拼豆图纸转换工具</h3>
+                <p class="card-desc">
+                    上传图片自动转换为拼豆像素图纸，生成配色方案与拼豆数量清单。
+                </p>
+                <ul class="card-features">
+                    <li>自定义画幅尺寸（像素格数）</li>
+                    <li>颜色量化与调色板匹配</li>
+                    <li>导出图纸预览 + 配色列表</li>
+                </ul>
+                <a href="/static/pages/bead-tool.html" class="card-btn">进入工具 &rarr;</a>
+            </div>
+
+        </section>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <p>FieldKit &copy; 2026 &middot; 基于 FastAPI + 原生前端构建</p>
+        </footer>
+    </main>
+
+    <!-- ============================================================ -->
+    <!-- 全局 Toast 容器（由 common.js 驱动） -->
+    <!-- ============================================================ -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/common.js"></script>
+</body>
+</html>
