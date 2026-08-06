@@ -113,9 +113,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ============================================================
 # 路由注册（后续分模块挂载）
-# 示例：from routes.image_tool import router as image_router
-#       app.include_router(image_router, prefix="/api/image", tags=["图片处理"])
 # ============================================================
+from routes.image_tool import router as image_router
+app.include_router(image_router)
 
 
 # ============================================================

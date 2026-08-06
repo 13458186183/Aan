@@ -5,19 +5,945 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>图片处理工具 - FieldKit</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* ====== 工具页专属样式 ====== */
+        :root {
+            --pink: #D89DB5;
+            --pink-hover: #C48A9F;
+            --pink-light: #FBF0F4;
+            --pink-border: #F0DCE4;
+            --gray-bg: #F8F9FA;
+            --gray-text: #64748B;
+            --radius: 10px;
+        }
+        body { background: var(--gray-bg); min-height: 100vh; }
+
+        /* 顶部导航条 */
+        .tool-header {
+            background: #fff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 0 32px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .tool-header .back-link {
+            color: var(--pink); text-decoration: none;
+            font-size: 14px; display: flex; align-items: center; gap: 6px;
+        }
+        .tool-header .back-link:hover { color: var(--pink-hover); }
+        .tool-header .tool-title {
+            font-size: 18px; font-weight: 600; color: #1E293B;
+        }
+        .tool-header .header-spacer { width: 80px; }
+
+        /* 主内容区 */
+        .tool-main {
+            max-width: 900px;
+            margin: 28px auto;
+            padding: 0 20px;
+        }
+
+        /* Tab 导航 */
+        .tab-nav {
+            display: flex; gap: 0;
+            background: #fff;
+            border-radius: var(--radius) var(--radius) 0 0;
+            border: 1px solid #E2E8F0; border-bottom: none;
+            overflow: hidden;
+        }
+        .tab-btn {
+            flex: 1; border: none; background: transparent;
+            padding: 14px 20px; font-size: 15px; font-weight: 500;
+            color: var(--gray-text); cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            position: relative;
+        }
+        .tab-btn:hover { color: var(--pink); background: var(--pink-light); }
+        .tab-btn.active {
+            color: var(--pink); font-weight: 600;
+            border-bottom-color: var(--pink);
+            background: var(--pink-light);
+        }
+
+        /* 面板容器 */
+        .tab-panels {
+            background: #fff;
+            border: 1px solid #E2E8F0; border-top: none;
+            border-radius: 0 0 var(--radius) var(--radius);
+            padding: 28px;
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* 上传区 */
+        .upload-zone {
+            border: 2px dashed #CBD5E1;
+            border-radius: var(--radius);
+            padding: 36px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s;
+            background: #FAFBFC;
+            margin-bottom: 20px;
+        }
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+            border-color: var(--pink);
+            background: var(--pink-light);
+        }
+        .upload-zone.has-file {
+            border-style: solid;
+            border-color: var(--pink);
+            background: #FEFCFD;
+        }
+        .upload-icon { font-size: 40px; margin-bottom: 8px; }
+        .upload-text { font-size: 14px; color: var(--gray-text); }
+        .upload-hint { font-size: 12px; color: #94A3B8; margin-top: 6px; }
+        .upload-preview {
+            display: none; max-width: 100%; max-height: 200px;
+            margin: 12px auto 0; border-radius: 6px; border: 1px solid #E2E8F0;
+        }
+        .upload-zone.has-file .upload-preview { display: block; }
+        .upload-zone.has-file .upload-placeholder { display: none; }
+        .upload-zone.has-file .upload-file-info {
+            font-size: 13px; color: var(--pink); margin-top: 8px;
+            font-weight: 500;
+        }
+        .upload-zone:not(.has-file) .upload-file-info { display: none; }
+
+        /* 参数区 */
+        .param-group {
+            display: flex; flex-wrap: wrap; gap: 16px;
+            margin-bottom: 16px;
+        }
+        .param-item { flex: 1; min-width: 160px; }
+        .param-item label {
+            display: block; font-size: 13px; font-weight: 500;
+            color: #334155; margin-bottom: 6px;
+        }
+        .param-item input,
+        .param-item select {
+            width: 100%; padding: 8px 12px;
+            border: 1px solid #CBD5E1; border-radius: 6px;
+            font-size: 14px; color: #1E293B;
+            box-sizing: border-box; transition: border-color 0.2s;
+        }
+        .param-item input:focus,
+        .param-item select:focus {
+            outline: none; border-color: var(--pink);
+            box-shadow: 0 0 0 3px var(--pink-light);
+        }
+        .param-item small {
+            display: block; font-size: 11px; color: #94A3B8; margin-top: 3px;
+        }
+
+        /* 位置网格选择器（水印） */
+        .pos-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 6px; max-width: 240px;
+        }
+        .pos-cell {
+            padding: 8px 4px; font-size: 12px; text-align: center;
+            border: 1px solid #CBD5E1; border-radius: 6px; cursor: pointer;
+            background: #fff; color: var(--gray-text);
+            transition: all 0.15s; user-select: none;
+        }
+        .pos-cell:hover { border-color: var(--pink); }
+        .pos-cell.selected {
+            border-color: var(--pink); background: var(--pink-light);
+            color: var(--pink); font-weight: 600;
+        }
+
+        /* 处理按钮 */
+        .btn-process {
+            width: 100%; padding: 12px;
+            background: var(--pink); color: #fff;
+            border: none; border-radius: 8px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; margin-top: 8px;
+        }
+        .btn-process:hover { background: var(--pink-hover); }
+        .btn-process:disabled {
+            opacity: 0.6; cursor: not-allowed;
+        }
+
+        /* 结果区 */
+        .result-section { display: none; margin-top: 24px; }
+        .result-section.show { display: block; }
+        .result-title {
+            font-size: 15px; font-weight: 600;
+            color: #1E293B; margin-bottom: 14px;
+            padding-bottom: 10px; border-bottom: 2px solid var(--pink-border);
+        }
+        .result-compare {
+            display: flex; gap: 20px; align-items: flex-start;
+        }
+        .result-col {
+            flex: 1; text-align: center;
+        }
+        .result-col img {
+            max-width: 100%; max-height: 300px;
+            border-radius: 8px; border: 1px solid #E2E8F0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .result-col .label {
+            font-size: 13px; color: var(--gray-text); margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .result-info {
+            margin-top: 14px; padding: 14px 18px;
+            background: #F8FAFB; border-radius: 8px;
+            font-size: 13px; color: #334155; line-height: 1.7;
+        }
+        .result-info strong { color: var(--pink); }
+        .btn-download {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 10px; padding: 8px 22px;
+            background: var(--pink); color: #fff;
+            border: none; border-radius: 6px;
+            font-size: 14px; font-weight: 500; cursor: pointer;
+            text-decoration: none; transition: background 0.2s;
+        }
+        .btn-download:hover { background: var(--pink-hover); }
+
+        /* ====== 水印预览区 ====== */
+        .wm-preview-container {
+            position: relative; overflow: hidden;
+            border-radius: 8px; border: 2px solid #E2E8F0;
+            background: #F1F5F9; min-height: 120px;
+            cursor: default; user-select: none;
+            transition: border-color 0.2s;
+        }
+        .wm-preview-container.has-image { border-color: #CBD5E1; }
+        .wm-preview-container img {
+            width: 100%; display: block;
+        }
+        .wm-placeholder {
+            display: flex; align-items: center; justify-content: center;
+            height: 160px; color: #94A3B8; font-size: 14px;
+        }
+        .wm-drag-text {
+            position: absolute; cursor: grab; white-space: nowrap;
+            user-select: none; font-weight: 700; pointer-events: auto;
+            text-shadow: 0 0 6px rgba(0,0,0,0.6), 0 0 2px rgba(0,0,0,0.8);
+            transition: none;
+        }
+        .wm-drag-text:active { cursor: grabbing; }
+        .wm-drag-text.dragging { cursor: grabbing; }
+
+        /* ====== 自定义 Range 滑块（解决两端空白） ====== */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #E2E8F0;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(
+                to right,
+                var(--pink) 0%,
+                var(--pink) var(--progress, 0%),
+                #E2E8F0 var(--progress, 0%),
+                #E2E8F0 100%
+            );
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--pink);
+            border: 2px solid #fff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+            margin-top: -6px;
+            cursor: grab;
+        }
+        input[type="range"]:active::-webkit-slider-thumb { cursor: grabbing; }
+        /* Firefox */
+        input[type="range"]::-moz-range-track {
+            height: 6px;
+            border-radius: 3px;
+            background: #E2E8F0;
+        }
+        input[type="range"]::-moz-range-progress {
+            height: 6px;
+            border-radius: 3px;
+            background: var(--pink);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--pink);
+            border: 2px solid #fff;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+            cursor: pointer;
+        }
+
+        /* ====== 压缩预估区 ====== */
+        .compress-estimate {
+            background: #F8FAFB;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #334155;
+        }
+        .estimate-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+        }
+        .estimate-label { color: #64748B; font-weight: 500; }
+        .estimate-value { font-weight: 600; color: #1E293B; }
+        .estimate-value.highlight { color: var(--pink); font-size: 15px; }
+        .estimate-meta {
+            font-size: 11px;
+            color: #94A3B8;
+            margin-top: 4px;
+            padding-top: 6px;
+            border-top: 1px dashed #E2E8F0;
+        }
+        .estimate-meta strong { color: #64748B; }
+        .estimate-hint { font-style: italic; }
+        .estimate-saved {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 1px 8px;
+            background: #ECFDF5;
+            color: #059669;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* 模式切换 */
+        .mode-toggle {
+            display: flex; gap: 0; border-radius: 8px;
+            border: 1px solid #CBD5E1; overflow: hidden;
+            width: 100%; max-width: 400px;
+        }
+        .mode-btn {
+            flex: 1; border: none; background: #fff;
+            padding: 10px 14px; font-size: 13px; cursor: pointer;
+            color: var(--gray-text); transition: all 0.2s;
+        }
+        .mode-btn:first-child { border-right: 1px solid #CBD5E1; }
+        .mode-btn.active {
+            background: var(--pink-light); color: var(--pink); font-weight: 600;
+        }
+        .mode-btn:hover:not(.active) { background: #F8FAFC; }
+
+        /* 平铺间距控制 */
+        .tile-spacing-row {
+            display: flex; gap: 16px; align-items: center; padding: 12px 16px;
+            background: #F8FAFB; border-radius: 8px; margin-bottom: 8px;
+        }
+
+        @media (max-width: 640px) {
+            .tool-main { padding: 0 12px; }
+            .tab-panels { padding: 16px; }
+            .result-compare { flex-direction: column; }
+        }
+    </style>
 </head>
 <body>
-    <main class="main-container">
-        <div class="page-header">
-            <a href="/static/index.html" class="page-back">&larr; 返回首页</a>
-            <h1 class="page-title">图片处理工具</h1>
+
+<!-- ====== 顶部导航 ====== -->
+<header class="tool-header">
+    <a href="/static/index.html" class="back-link">&#8592; 返回首页</a>
+    <span class="tool-title">&#128247; 图片处理工具</span>
+    <span class="header-spacer"></span>
+</header>
+
+<!-- ====== 主内容 ====== -->
+<main class="tool-main">
+
+    <!-- Tab 导航 -->
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="compress">&#128206; 图片压缩</button>
+        <button class="tab-btn" data-tab="resize">&#128207; 尺寸缩放</button>
+        <button class="tab-btn" data-tab="watermark">&#128432; 文字水印</button>
+    </nav>
+
+    <!-- ====== 共享上传区 ====== -->
+    <div class="tab-panels">
+        <div class="upload-zone" id="uploadZone">
+            <div class="upload-placeholder">
+                <div class="upload-icon">&#128228;</div>
+                <div class="upload-text">点击上传图片，或将图片拖拽到此处</div>
+                <div class="upload-hint" id="uploadHint">支持 JPG / PNG / WebP / BMP，单文件最大 20MB</div>
+            </div>
+            <img class="upload-preview" id="uploadPreview" alt="预览">
+            <div class="upload-file-info" id="uploadFileInfo"></div>
         </div>
-        <div class="card" style="text-align:center; padding: 80px 0; color: var(--color-text-muted);">
-            <p style="font-size:48px; margin-bottom:16px;">&#128247;</p>
-            <p>模块开发中，敬请期待...</p>
+
+        <!-- ====== 面板①：图片压缩 ====== -->
+        <div class="tab-panel active" id="panel-compress">
+            <div class="param-group">
+                <div class="param-item">
+                    <label>压缩质量</label>
+                    <input type="range" id="compressQuality" min="1" max="100" value="80">
+                    <small>当前值：<strong id="qualityValue">80</strong> &mdash; 越低体积越小，画质越差</small>
+                </div>
+            </div>
+            <div class="compress-estimate">
+                <div class="estimate-row">
+                    <span class="estimate-label">原文件大小</span>
+                    <span class="estimate-value" id="originalSize">-</span>
+                </div>
+                <div class="estimate-row">
+                    <span class="estimate-label">预估压缩后</span>
+                    <span>
+                        <span class="estimate-value highlight" id="estimatedSize">-</span>
+                        <span class="estimate-saved" id="estimateSaved"></span>
+                    </span>
+                </div>
+                <div class="estimate-row estimate-meta">
+                    <span>预估压缩率：<strong id="estimatedRatio">-</strong></span>
+                    <span class="estimate-hint">实际以服务器结果为准</span>
+                </div>
+            </div>
+            <button class="btn-process" id="btnCompress" disabled>&#9889; 开始压缩</button>
         </div>
-    </main>
-    <div id="toast-container" class="toast-container"></div>
-    <script src="/static/js/common.js"></script>
+
+        <!-- ====== 面板②：尺寸缩放 ====== -->
+        <div class="tab-panel" id="panel-resize">
+            <div class="param-group">
+                <div class="param-item">
+                    <label>目标宽度 (px)</label>
+                    <input type="number" id="resizeWidth" placeholder="留空则自动计算" min="1" max="8000" value="800">
+                    <small>建议 200~4000 像素</small>
+                </div>
+                <div class="param-item">
+                    <label>目标高度 (px)</label>
+                    <input type="number" id="resizeHeight" placeholder="留空则自动计算" min="1" max="8000" value="600">
+                </div>
+            </div>
+            <div class="param-group">
+                <div class="param-item">
+                    <label>缩放模式</label>
+                    <select id="resizeMode">
+                        <option value="inside">等比缩放（限制在框内，不裁剪）</option>
+                        <option value="cover">等比缩放（填满画框，居中裁剪）</option>
+                        <option value="exact">精确拉伸（可能变形）</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn-process" id="btnResize" disabled>&#9889; 开始缩放</button>
+        </div>
+
+        <!-- ====== 面板③：文字水印 ====== -->
+        <div class="tab-panel" id="panel-watermark">
+            <!-- 文字 + 字号 -->
+            <div class="param-group">
+                <div class="param-item" style="min-width:240px;">
+                    <label>水印文字</label>
+                    <input type="text" id="wmText" placeholder="输入水印文字，如 © FieldKit" maxlength="200" value="">
+                </div>
+                <div class="param-item">
+                    <label>字体大小</label>
+                    <input type="number" id="wmFontSize" min="8" max="200" value="48">
+                    <small>8~200</small>
+                </div>
+            </div>
+            <!-- 不透明度 + 颜色 -->
+            <div class="param-group">
+                <div class="param-item">
+                    <label>不透明度</label>
+                    <input type="range" id="wmOpacity" min="0" max="100" value="40">
+                    <small>当前值：<strong id="opacityValue">0.4</strong> &mdash; 越高水印越明显</small>
+                </div>
+                <div class="param-item">
+                    <label>文字颜色</label>
+                    <select id="wmColor">
+                        <option value="255,255,255">白色</option>
+                        <option value="0,0,0">黑色</option>
+                        <option value="255,0,0">红色</option>
+                        <option value="128,128,128">灰色</option>
+                        <option value="0,120,255">蓝色</option>
+                    </select>
+                </div>
+            </div>
+            <!-- 旋转角度 -->
+            <div class="param-group">
+                <div class="param-item">
+                    <label>旋转角度</label>
+                    <input type="range" id="wmRotation" min="0" max="360" value="0">
+                    <small>当前值：<strong id="rotationValue">0°</strong></small>
+                </div>
+            </div>
+            <!-- 水印模式切换 -->
+            <div class="param-item" style="margin-bottom:6px;">
+                <label>水印模式</label>
+            </div>
+            <div style="margin-bottom:12px;">
+                <div class="mode-toggle" id="modeToggle">
+                    <button class="mode-btn active" data-mode="single">单个水印（可拖拽定位）</button>
+                    <button class="mode-btn" data-mode="tile">平铺全屏（防盗图）</button>
+                </div>
+            </div>
+
+            <!-- 单个水印：拖拽预览 -->
+            <div id="wmSinglePanel">
+                <div class="param-item" style="margin-bottom:6px;">
+                    <label>拖拽水印文字调整位置</label>
+                </div>
+                <div class="wm-preview-container" id="wmPreviewContainer">
+                    <div class="wm-placeholder" id="wmPlaceholder">
+                        &#128247; 上传图片后此处显示水印预览
+                    </div>
+                    <img id="wmPreviewImg" alt="水印预览" style="display:none;">
+                    <div class="wm-drag-text" id="wmDragText"
+                         style="display:none;">水印预览</div>
+                </div>
+                <small style="color:#94A3B8; font-size:11px; display:block; margin-top:6px;">
+                    拖拽水印文字自由定位，当前位置：<strong id="wmPosLabel">右下 (95%, 95%)</strong>
+                </small>
+            </div>
+
+            <!-- 平铺全屏：间距控制 -->
+            <div id="wmTilePanel" style="display:none;">
+                <div class="tile-spacing-row">
+                    <div class="param-item" style="margin-bottom:0;">
+                        <label>水平间距 (px)</label>
+                        <input type="number" id="wmSpacingX" min="0" max="2000" value="0" style="width:100px;">
+                        <small>0 = 自动间距</small>
+                    </div>
+                    <div class="param-item" style="margin-bottom:0;">
+                        <label>垂直间距 (px)</label>
+                        <input type="number" id="wmSpacingY" min="0" max="2000" value="0" style="width:100px;">
+                        <small>0 = 自动间距</small>
+                    </div>
+                </div>
+                <small style="color:#94A3B8; font-size:11px; display:block; margin-bottom:8px;">
+                    水印将以网格形式重复铺满整张图片，配合旋转角度效果更佳
+                </small>
+            </div>
+
+            <button class="btn-process" id="btnWatermark" disabled>&#9889; 添加水印</button>
+        </div>
+
+        <!-- ====== 处理结果（共用） ====== -->
+        <div class="result-section" id="resultSection">
+            <div class="result-title">&#9989; 处理结果</div>
+            <div class="result-compare">
+                <div class="result-col">
+                    <div class="label">原图</div>
+                    <img id="resultBefore" alt="原图">
+                </div>
+                <div class="result-col">
+                    <div class="label">处理后</div>
+                    <img id="resultAfter" alt="处理后">
+                </div>
+            </div>
+            <div class="result-info" id="resultInfo"></div>
+            <a class="btn-download" id="btnDownload" href="#" target="_blank">
+                &#128229; 下载处理后的图片
+            </a>
+        </div>
+    </div>
+</main>
+
+<!-- Toast 容器 + common.js -->
+<div id="toast-container" class="toast-container"></div>
+<script src="/static/js/common.js"></script>
+
+<script>
+/* ================================================================
+ * 图片处理工具 - 前端交互逻辑
+ * ================================================================ */
+(function () {
+    const ACCEPT = ".jpg,.jpeg,.png,.webp,.bmp,.tiff";
+
+    // ===== DOM 索引 =====
+    const uploadZone  = document.getElementById("uploadZone");
+    const uploadPreview = document.getElementById("uploadPreview");
+    const uploadFileInfo = document.getElementById("uploadFileInfo");
+    const uploadHint    = document.getElementById("uploadHint");
+    const resultSection = document.getElementById("resultSection");
+
+    let currentFile  = null;   // 当前选中的 File 对象
+    let lastResult   = null;   // 最后一次接口返回的 data
+    let activeTab    = "compress";
+    let wmPosition   = "bottom-right";
+    let wmMode       = "single";  // "single" | "tile"
+    let wmDragX      = 0.95;      // 水印 X (0-1)
+    let wmDragY      = 0.95;      // 水印 Y (0-1)
+    let wmRotation   = 0;         // 旋转角度
+
+    // ===== 上传区初始化 =====
+    const uploader = initUploadZone(uploadZone, {
+        accept: ACCEPT,
+        multiple: false,
+        maxFileSizeMB: 20,
+        onFilesSelected(files) {
+            if (files.length === 0) return;
+            setFile(files[0]);
+        },
+    });
+
+    function setFile(file) {
+        currentFile = file;
+        // 上传区预览
+        const url = URL.createObjectURL(file);
+        uploadPreview.src = url;
+        uploadPreview.onload = () => URL.revokeObjectURL(url);
+        uploadZone.classList.add("has-file");
+        uploadFileInfo.textContent = file.name + "  (" + formatFileSize(file.size) + ")";
+        uploadHint.textContent = "点击可重新选择图片";
+        // 水印预览区加载同一张图
+        const wmImg = document.getElementById("wmPreviewImg");
+        const wmPlaceholder = document.getElementById("wmPlaceholder");
+        const wmContainer = document.getElementById("wmPreviewContainer");
+        wmImg.src = url;
+        wmImg.onload = () => {
+            wmImg.style.display = "block";
+            wmPlaceholder.style.display = "none";
+            wmContainer.classList.add("has-image");
+            updateWmPreview();
+        };
+        updateButtons();
+        updateCompressEstimate();
+    }
+
+    function clearFile() {
+        currentFile = null;
+        uploadZone.classList.remove("has-file");
+        uploadPreview.src = "";
+        uploadFileInfo.textContent = "";
+        uploadHint.textContent = "支持 JPG / PNG / WebP / BMP，单文件最大 20MB";
+        // 重置水印预览
+        const wmImg = document.getElementById("wmPreviewImg");
+        const wmPlaceholder = document.getElementById("wmPlaceholder");
+        const wmDragText = document.getElementById("wmDragText");
+        const wmContainer = document.getElementById("wmPreviewContainer");
+        wmImg.src = ""; wmImg.style.display = "none";
+        wmPlaceholder.style.display = "flex";
+        wmDragText.style.display = "none";
+        wmContainer.classList.remove("has-image");
+        updateButtons();
+        updateCompressEstimate();
+        hideResult();
+    }
+
+    // 双击上传区清除文件
+    uploadZone.addEventListener("dblclick", (e) => {
+        if (currentFile) {
+            clearFile();
+            Toast.info("已清除当前图片");
+        }
+    });
+
+    // ===== Tab 切换 =====
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+            btn.classList.add("active");
+            activeTab = btn.dataset.tab;
+            document.getElementById("panel-" + activeTab).classList.add("active");
+            updateButtons();
+            hideResult();
+        });
+    });
+
+    // ===== 按钮状态控制 =====
+    function updateButtons() {
+        const has = !!currentFile;
+        document.getElementById("btnCompress").disabled  = !has;
+        document.getElementById("btnResize").disabled    = !has;
+        document.getElementById("btnWatermark").disabled = !has;
+    }
+
+    // ===== 结果展示 =====
+    function showResult(beforeUrl, afterUrl, infoHtml) {
+        document.getElementById("resultBefore").src = beforeUrl;
+        document.getElementById("resultAfter").src  = afterUrl;
+        document.getElementById("resultInfo").innerHTML = infoHtml;
+        document.getElementById("btnDownload").href = afterUrl;
+        resultSection.classList.add("show");
+        resultSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function hideResult() {
+        resultSection.classList.remove("show");
+    }
+
+    // ===== 压缩滑块联动 + 预估压缩大小 =====
+    const qualitySlider = document.getElementById("compressQuality");
+    const qualityValue  = document.getElementById("qualityValue");
+    qualitySlider.addEventListener("input", () => {
+        qualityValue.textContent = qualitySlider.value;
+        updateCompressEstimate();
+    });
+
+    // ===== 预估压缩大小 =====
+    function updateCompressEstimate() {
+        const oEl = document.getElementById("originalSize");
+        const eEl = document.getElementById("estimatedSize");
+        const rEl = document.getElementById("estimatedRatio");
+        const sEl = document.getElementById("estimateSaved");
+        if (!currentFile) {
+            oEl.textContent = "-";
+            eEl.textContent = "-";
+            rEl.textContent = "-";
+            if (sEl) sEl.textContent = "";
+            return;
+        }
+        const originalSize = currentFile.size;
+        const q = parseInt(qualitySlider.value, 10) / 100;
+        // 经验公式：quality=100 → ~100%, quality=80 → ~50%, quality=20 → ~10%
+        const ratio = 0.04 + 0.96 * Math.pow(q, 2.2);
+        const estimatedSize = Math.round(originalSize * ratio);
+        const savedPercent = ((1 - ratio) * 100).toFixed(0);
+        oEl.textContent = formatFileSize(originalSize);
+        eEl.textContent = formatFileSize(estimatedSize);
+        rEl.textContent = (ratio * 100).toFixed(0) + "%";
+        if (sEl) sEl.textContent = savedPercent > 5 ? ("省 " + savedPercent + "%") : "";
+    }
+
+    // ===== 所有 range 滑块的进度条填充（解决两端空白） =====
+    function updateRangeProgress(slider) {
+        const min = parseFloat(slider.min) || 0;
+        const max = parseFloat(slider.max) || 100;
+        const val = parseFloat(slider.value);
+        const percent = ((val - min) / (max - min)) * 100;
+        slider.style.setProperty("--progress", percent + "%");
+    }
+    document.querySelectorAll('input[type="range"]').forEach(slider => {
+        updateRangeProgress(slider);
+        slider.addEventListener("input", () => updateRangeProgress(slider));
+    });
+
+    // ===== 透明度滑块联动（同时刷新水印预览） =====
+    const opacitySlider = document.getElementById("wmOpacity");
+    const opacityValue  = document.getElementById("opacityValue");
+    opacitySlider.addEventListener("input", () => {
+        opacityValue.textContent = (opacitySlider.value / 100).toFixed(1);
+        updateWmPreview();
+    });
+
+    // ===== 旋转角度联动 =====
+    const rotationSlider = document.getElementById("wmRotation");
+    const rotationValueEl = document.getElementById("rotationValue");
+    rotationSlider.addEventListener("input", () => {
+        wmRotation = parseInt(rotationSlider.value, 10);
+        rotationValueEl.textContent = wmRotation + "°";
+        updateWmPreview();
+    });
+
+    // ===== 水印模式切换 =====
+    document.getElementById("modeToggle").addEventListener("click", (e) => {
+        const btn = e.target.closest(".mode-btn");
+        if (!btn) return;
+        document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        wmMode = btn.dataset.mode;
+        document.getElementById("wmSinglePanel").style.display = (wmMode === "single") ? "block" : "none";
+        document.getElementById("wmTilePanel").style.display = (wmMode === "tile") ? "block" : "none";
+        updateWmPreview();
+    });
+
+    // ===== 水印预览 + 拖拽定位 =====
+    const wmPreviewContainer = document.getElementById("wmPreviewContainer");
+    const wmPreviewImgEl = document.getElementById("wmPreviewImg");
+    const wmDragText = document.getElementById("wmDragText");
+    const wmPosLabel = document.getElementById("wmPosLabel");
+
+    function updateWmPreview() {
+        if (!currentFile || !wmPreviewImgEl.complete || !wmPreviewImgEl.naturalWidth) {
+            wmDragText.style.display = "none";
+            return;
+        }
+        if (wmMode === "tile") {
+            wmDragText.style.display = "none";
+            return;
+        }
+        const text = document.getElementById("wmText").value.trim() || "水印预览";
+        const fontSize = parseInt(document.getElementById("wmFontSize").value, 10) || 48;
+        const colorRgb = document.getElementById("wmColor").value;
+        const opacityVal = parseFloat(opacitySlider.value) / 100;
+
+        wmDragText.textContent = text;
+        wmDragText.style.fontSize = fontSize + "px";
+        wmDragText.style.color = "rgb(" + colorRgb + ")";
+        wmDragText.style.opacity = opacityVal;
+        wmDragText.style.display = "block";
+
+        requestAnimationFrame(() => {
+            const cw = wmPreviewContainer.clientWidth;
+            const ch = wmPreviewContainer.clientHeight;
+            const tw = wmDragText.offsetWidth;
+            const th = wmDragText.offsetHeight;
+            const left = Math.max(0, Math.min(wmDragX * cw, cw - tw));
+            const top  = Math.max(0, Math.min(wmDragY * ch, ch - th));
+            wmDragText.style.left = left + "px";
+            wmDragText.style.top  = top  + "px";
+            wmDragText.style.transform = "rotate(" + (-wmRotation) + "deg)";
+
+            const dx = wmDragX < 0.33 ? "左" : wmDragX > 0.67 ? "右" : "中";
+            const dy = wmDragY < 0.33 ? "上" : wmDragY > 0.67 ? "下" : "中";
+            wmPosLabel.textContent =
+                dy + dx + " (" + (wmDragX * 100).toFixed(0) + "%, " + (wmDragY * 100).toFixed(0) + "%)";
+        });
+    }
+
+    // 文字 / 字号 / 颜色变化 → 实时刷新预览
+    document.getElementById("wmText").addEventListener("input", updateWmPreview);
+    document.getElementById("wmFontSize").addEventListener("input", updateWmPreview);
+    document.getElementById("wmColor").addEventListener("change", updateWmPreview);
+
+    // 拖拽水印文字
+    let isDragging = false;
+    wmDragText.addEventListener("mousedown", (e) => {
+        if (wmMode !== "single") return;
+        e.preventDefault();
+        isDragging = true;
+        wmDragText.classList.add("dragging");
+        const startX = e.clientX, startY = e.clientY;
+        const startLeft = wmDragX, startTop = wmDragY;
+        const rect = wmPreviewContainer.getBoundingClientRect();
+
+        function onMove(ev) {
+            if (!isDragging) return;
+            const dx = ev.clientX - startX, dy = ev.clientY - startY;
+            wmDragX = Math.max(0, Math.min(1, startLeft + dx / rect.width));
+            wmDragY = Math.max(0, Math.min(1, startTop  + dy / rect.height));
+            updateWmPreview();
+        }
+        function onUp() {
+            isDragging = false;
+            wmDragText.classList.remove("dragging");
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+        }
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+    });
+
+    // ===== 位置选择器（九宫格已移除）=====
+
+    // ===== 通用上传处理 =====
+    async function doProcess(endpoint, extraParams = {}) {
+        if (!currentFile) {
+            Toast.warning("请先选择一张图片");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", currentFile);
+        for (const [key, val] of Object.entries(extraParams)) {
+            formData.append(key, String(val));
+        }
+
+        toggleLoading(true, "处理中，请稍候...");
+        hideResult();
+
+        try {
+            const result = await API.upload(endpoint, formData);
+
+            if (result.ok && result.data?.ok) {
+                lastResult = result.data.data;
+                const beforeUrl = URL.createObjectURL(currentFile);
+                const afterUrl  = lastResult.download_url;
+
+                // 构造信息行
+                const info = buildResultInfo(lastResult, activeTab);
+                showResult(beforeUrl, afterUrl, info);
+                Toast.success(result.data.message || "处理成功");
+            } else {
+                const errMsg = result.data?.error || result.error || "处理失败";
+                Toast.error(errMsg);
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    }
+
+    function buildResultInfo(data, tab) {
+        let html = "";
+        if (tab === "compress") {
+            html += "原文件大小: <strong>" + escapeHtml(data.original_size) + "</strong><br>";
+            html += "压缩后大小: <strong>" + escapeHtml(data.compressed_size) + "</strong><br>";
+            html += "压缩质量: <strong>" + data.quality + "%</strong>";
+        } else if (tab === "resize") {
+            html += "原始尺寸: <strong>" + escapeHtml(data.original_size) + "</strong><br>";
+            html += "缩放后尺寸: <strong>" + escapeHtml(data.resized_size) + "</strong><br>";
+            html += "缩放模式: <strong>" + escapeHtml(data.mode) + "</strong>";
+        } else if (tab === "watermark") {
+            html += "水印文字: <strong>" + escapeHtml(data.watermark_text) + "</strong><br>";
+            html += "模式: <strong>" + (data.tile ? "平铺全屏" : "单个") + "</strong><br>";
+            html += "位置: <strong>" + escapeHtml(data.position) + "</strong><br>";
+            html += "不透明度: <strong>" + data.opacity + "</strong>";
+            if (data.rotation) html += " &middot; 角度: <strong>" + data.rotation + "°</strong>";
+        }
+        return html;
+    }
+
+    // ===== 按钮事件 =====
+    document.getElementById("btnCompress").addEventListener("click", () => {
+        const quality = parseInt(qualitySlider.value, 10);
+        doProcess("/api/image/compress", { quality });
+    });
+
+    document.getElementById("btnResize").addEventListener("click", () => {
+        const width  = document.getElementById("resizeWidth").value || null;
+        const height = document.getElementById("resizeHeight").value || null;
+        const mode   = document.getElementById("resizeMode").value;
+
+        if (!width && !height) {
+            Toast.warning("请至少填写宽度或高度其中一个");
+            return;
+        }
+        const params = { keep_ratio: true, mode };
+        if (width)  params.width  = parseInt(width, 10);
+        if (height) params.height = parseInt(height, 10);
+        if (mode === "exact") params.keep_ratio = false;
+
+        doProcess("/api/image/resize", params);
+    });
+
+    document.getElementById("btnWatermark").addEventListener("click", () => {
+        const text     = document.getElementById("wmText").value.trim();
+        const fontSize = parseInt(document.getElementById("wmFontSize").value, 10);
+        const opacity  = parseFloat(opacitySlider.value) / 100;
+        const color    = document.getElementById("wmColor").value;
+
+        if (!text) { Toast.warning("请输入水印文字"); return; }
+
+        const params = {
+            text, font_size: fontSize, opacity, color,
+            rotation: wmRotation,
+            tile: wmMode === "tile",
+        };
+
+        if (wmMode === "tile") {
+            params.spacing_x = parseInt(document.getElementById("wmSpacingX").value, 10) || 0;
+            params.spacing_y = parseInt(document.getElementById("wmSpacingY").value, 10) || 0;
+        } else {
+            params.x = Math.round(wmDragX * 100) / 100;
+            params.y = Math.round(wmDragY * 100) / 100;
+        }
+
+        doProcess("/api/image/watermark", params);
+    });
+
+})();
+</script>
+
 </body>
 </html>
