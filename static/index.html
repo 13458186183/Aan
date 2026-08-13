@@ -34,7 +34,7 @@
         <section class="hero">
             <h1 class="hero-title">一站式 Web 工具箱</h1>
             <p class="hero-desc">
-                图片处理 &middot; 考勤点名 &middot; 测绘水印 &middot; 资产清查 &middot; 拼豆图纸
+                图片处理 &middot; 文件工具箱 &middot; 拼豆图纸 &middot; 考勤点名 &middot; 资产清查 &middot; 测绘水印
             </p>
         </section>
 
@@ -71,19 +71,19 @@
                 <a href="/static/pages/attendance-tool.html" class="card-btn">进入工具 &rarr;</a>
             </div>
 
-            <!-- 3. 测绘 EXIF 水印工具 -->
-            <div class="tool-card" data-tool="survey">
-                <div class="card-icon icon-survey">&#127758;</div>
-                <h3 class="card-title">测绘 EXIF 水印工具</h3>
+            <!-- 3. 文件工具箱 -->
+            <div class="tool-card" data-tool="file">
+                <div class="card-icon icon-file">&#128452;</div>
+                <h3 class="card-title">文件工具箱</h3>
                 <p class="card-desc">
-                    批量给照片写入 GPS 经纬度、拍摄时间、设备信息等 EXIF 元数据。
+                    批量重命名、打包压缩、解压文件，一站式文件操作工具集。
                 </p>
                 <ul class="card-features">
-                    <li>GPS 经纬度嵌入（度分秒）</li>
-                    <li>自定义拍摄时间、相机型号</li>
-                    <li>支持 JPG / TIFF 格式</li>
+                    <li>自定义前缀 + 序号批量重命名</li>
+                    <li>多文件打包 zip 压缩下载</li>
+                    <li>zip 解压并支持文件下载</li>
                 </ul>
-                <a href="/static/pages/survey-tool.html" class="card-btn">进入工具 &rarr;</a>
+                <a href="/static/pages/file-tool.html" class="card-btn">进入工具 &rarr;</a>
             </div>
 
             <!-- 4. 村级资产清查表工具 -->
@@ -114,6 +114,21 @@
                     <li>导出图纸预览 + 配色列表</li>
                 </ul>
                 <a href="/static/pages/bead-tool.html" class="card-btn">进入工具 &rarr;</a>
+            </div>
+
+            <!-- 6. 测绘 EXIF 水印工具 -->
+            <div class="tool-card" data-tool="survey">
+                <div class="card-icon icon-survey">&#128205;</div>
+                <h3 class="card-title">测绘 EXIF 水印工具</h3>
+                <p class="card-desc">
+                    为外业照片批量写入 GPS 坐标、拍摄时间、设备型号等元数据水印，便于成果归档与溯源。
+                </p>
+                <ul class="card-features">
+                    <li>保留原始 EXIF 信息</li>
+                    <li>批量写入 GPS / 时间戳水印</li>
+                    <li>支持 JPG / TIFF / PNG</li>
+                </ul>
+                <a href="/static/pages/survey-tool.html" class="card-btn">进入工具 &rarr;</a>
             </div>
 
         </section>

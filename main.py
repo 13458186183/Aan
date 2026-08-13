@@ -1,8 +1,8 @@
 """
 FieldKit - 一站式 Web 工具箱 项目入口
 ======================================
-基于 FastAPI 构建，提供图片处理、考勤点名、测绘水印、
-村级资产清查、拼豆图纸转换等工具服务。
+基于 FastAPI 构建，提供图片处理、文件工具箱、拼豆图纸转换等 Web 服务；
+考勤点名、资产清查、测绘水印等模块还在搭建中。
 
 启动方式：
     uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -13,6 +13,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -84,7 +85,7 @@ async def lifespan(app: FastAPI):
 # ============================================================
 app = FastAPI(
     title="FieldKit - 一站式 Web 工具箱",
-    description="提供图片处理、考勤点名、测绘水印、村级资产清查、拼豆图纸转换等工具服务",
+    description="提供图片处理、文件工具箱、拼豆图纸转换等 Web 服务",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",       # Swagger UI 文档地址
@@ -116,24 +117,36 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ============================================================
 from routes.image_tool import router as image_router
 app.include_router(image_router)
+from routes.file_tool import router as file_router
+app.include_router(file_router)
+from routes.bead_tool import router as bead_router
+app.include_router(bead_router)
+
 
 
 # ============================================================
-# 根路径 - API 信息页
+# 根路径 - 首页 HTML
 # ============================================================
-@app.get("/", tags=["系统"])
+@app.get("/", tags=["系统"], include_in_schema=False)
 async def root():
-    """返回工具箱基本信息"""
+    """返回首页 HTML（导航页）"""
+    return FileResponse("static/index.html", media_type="text/html")
+
+
+@app.get("/api/info", tags=["系统"])
+async def api_info():
+    """工具箱基本信息（JSON，供 API 文档/调试）"""
     return {
         "name": "FieldKit - 一站式 Web 工具箱",
         "version": "1.0.0",
         "docs": "/docs",
         "modules": [
-            {"name": "图片处理工具", "status": "待开发", "priority": "高"},
-            {"name": "考勤点名工具", "status": "待开发", "priority": "高"},
-            {"name": "测绘 EXIF 水印工具", "status": "待开发", "priority": "高"},
-            {"name": "村级资产清查表工具", "status": "待开发", "priority": "中"},
-            {"name": "拼豆图纸转换工具", "status": "待开发", "priority": "中"},
+            {"name": "图片处理工具", "priority": "高"},
+            {"name": "文件工具箱", "priority": "高"},
+            {"name": "拼豆图纸转换工具", "priority": "中"},
+            {"name": "考勤点名工具", "priority": "高"},
+            {"name": "村级资产清查表工具", "priority": "中"},
+            {"name": "测绘 EXIF 水印工具", "priority": "高"},
         ],
     }
 

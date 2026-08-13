@@ -252,6 +252,7 @@ img {
 }
 .badge-high { background: #FEF2F2; color: #DC2626; }
 .badge-mid  { background: #FFFBEB; color: #D97706; }
+.badge-ok   { background: #ECFDF5; color: #059669; }
 
 .card-title {
     font-size: 18px;

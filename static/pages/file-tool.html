@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件工具箱 - FieldKit</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        :root {
+            --blue: #5B8DEF;
+            --blue-hover: #4A7DE0;
+            --blue-light: #EEF3FC;
+            --blue-border: #D6E4F8;
+            --gray-bg: #F8F9FA;
+            --gray-text: #64748B;
+            --radius: 10px;
+        }
+        body { background: var(--gray-bg); min-height: 100vh; }
+
+        .tool-header {
+            background: #fff; border-bottom: 1px solid #E2E8F0;
+            padding: 0 32px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .tool-header .back-link { color: var(--blue); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+        .tool-header .back-link:hover { color: var(--blue-hover); }
+        .tool-header .tool-title { font-size: 18px; font-weight: 600; color: #1E293B; }
+        .tool-header .header-spacer { width: 80px; }
+
+        .tool-main { max-width: 900px; margin: 28px auto; padding: 0 20px; }
+
+        .tab-nav {
+            display: flex; gap: 0;
+            background: #fff; border-radius: var(--radius) var(--radius) 0 0;
+            border: 1px solid #E2E8F0; border-bottom: none; overflow: hidden;
+        }
+        .tab-btn {
+            flex: 1; border: none; background: transparent;
+            padding: 14px 20px; font-size: 15px; font-weight: 500;
+            color: var(--gray-text); cursor: pointer;
+            transition: all 0.2s; border-bottom: 3px solid transparent;
+        }
+        .tab-btn:hover { color: var(--blue); background: var(--blue-light); }
+        .tab-btn.active { color: var(--blue); font-weight: 600; border-bottom-color: var(--blue); background: var(--blue-light); }
+
+        .tab-panels {
+            background: #fff; border: 1px solid #E2E8F0; border-top: none;
+            border-radius: 0 0 var(--radius) var(--radius); padding: 28px;
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* 上传区 */
+        .upload-zone {
+            border: 2px dashed #CBD5E1; border-radius: var(--radius);
+            padding: 36px 20px; text-align: center; cursor: pointer;
+            transition: all 0.25s; background: #FAFBFC; margin-bottom: 20px;
+        }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: var(--blue); background: var(--blue-light); }
+        .upload-zone.has-file { border-style: solid; border-color: var(--blue); background: #F8FAFE; }
+        .upload-icon { font-size: 40px; margin-bottom: 8px; }
+        .upload-text { font-size: 14px; color: var(--gray-text); }
+        .upload-hint { font-size: 12px; color: #94A3B8; margin-top: 6px; }
+        .upload-file-list { font-size: 13px; color: var(--blue); margin-top: 10px; text-align: left; max-height: 120px; overflow-y: auto; line-height: 1.8; }
+        .upload-file-list .file-item { padding: 2px 6px; border-radius: 4px; }
+        .upload-file-list .file-item:nth-child(odd) { background: #F1F5F9; }
+        .upload-file-list .file-size { color: #94A3B8; margin-left: 8px; font-size: 12px; }
+        .upload-zone:not(.has-file) .upload-file-list { display: none; }
+
+        /* 参数区 */
+        .param-group { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 16px; }
+        .param-item { flex: 1; min-width: 160px; }
+        .param-item label { display: block; font-size: 13px; font-weight: 500; color: #334155; margin-bottom: 6px; }
+        .param-item input, .param-item select {
+            width: 100%; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px;
+            font-size: 14px; color: #1E293B; box-sizing: border-box; transition: border-color 0.2s;
+        }
+        .param-item input:focus, .param-item select:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-light); }
+        .param-item small { display: block; font-size: 11px; color: #94A3B8; margin-top: 3px; }
+
+        .btn-process {
+            width: 100%; padding: 12px; background: var(--blue); color: #fff;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; margin-top: 8px;
+        }
+        .btn-process:hover { background: var(--blue-hover); }
+        .btn-process:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* 结果区 */
+        .result-section { display: none; margin-top: 24px; }
+        .result-section.show { display: block; }
+        .result-title {
+            font-size: 15px; font-weight: 600; color: #1E293B; margin-bottom: 14px;
+            padding-bottom: 10px; border-bottom: 2px solid var(--blue-border);
+        }
+        .result-summary { font-size: 13px; color: var(--gray-text); margin-bottom: 12px; }
+        .result-summary strong { color: var(--blue); }
+        .result-list { max-height: 300px; overflow-y: auto; }
+        .result-list table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .result-list th {
+            text-align: left; padding: 8px 12px; background: #F1F5F9;
+            color: #475569; font-weight: 600; border-bottom: 2px solid #E2E8F0;
+        }
+        .result-list td { padding: 7px 12px; border-bottom: 1px solid #F1F5F9; color: #334155; }
+        .result-list tr:hover td { background: #FAFBFC; }
+        .result-list .dl-link { color: var(--blue); text-decoration: none; font-weight: 500; }
+        .result-list .dl-link:hover { text-decoration: underline; }
+        .btn-download-main {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 14px; padding: 8px 22px;
+            background: var(--blue); color: #fff; border: none; border-radius: 6px;
+            font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; transition: background 0.2s;
+        }
+        .btn-download-main:hover { background: var(--blue-hover); }
+
+        @media (max-width: 640px) {
+            .tool-main { padding: 0 12px; }
+            .tab-panels { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====== 顶部导航 ====== -->
+<header class="tool-header">
+    <a href="/static/index.html" class="back-link">&#8592; 返回首页</a>
+    <span class="tool-title">&#128452; 文件工具箱</span>
+    <span class="header-spacer"></span>
+</header>
+
+<!-- ====== 主内容 ====== -->
+<main class="tool-main">
+
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="rename">&#9998; 批量重命名</button>
+        <button class="tab-btn" data-tab="zip">&#128230; 打包压缩</button>
+        <button class="tab-btn" data-tab="unzip">&#128229; 解压文件</button>
+    </nav>
+
+    <div class="tab-panels">
+
+        <!-- ====== 标签①：批量重命名 ====== -->
+        <div class="tab-panel active" id="panel-rename">
+
+            <div class="upload-zone" id="uploadZoneRename">
+                <div class="upload-placeholder">
+                    <div class="upload-icon">&#128228;</div>
+                    <div class="upload-text">点击或拖拽上传需要重命名的文件</div>
+                    <div class="upload-hint" id="renameHint">支持任意格式，可多选</div>
+                </div>
+                <div class="upload-file-list" id="renameFileList"></div>
+            </div>
+
+            <div class="param-group">
+                <div class="param-item">
+                    <label>文件名前缀</label>
+                    <input type="text" id="renamePrefix" placeholder="例如：照片" maxlength="50" value="">
+                    <small>生成格式：<code>前缀_001.ext</code></small>
+                </div>
+                <div class="param-item">
+                    <label>起始序号</label>
+                    <input type="number" id="renameStartNum" min="0" max="9999" value="1">
+                    <small>0 ~ 9999</small>
+                </div>
+            </div>
+
+            <button class="btn-process" id="btnRename" disabled>&#9889; 开始重命名</button>
+
+            <div class="result-section" id="renameResult">
+                <div class="result-title">&#9989; 重命名结果</div>
+                <div class="result-summary" id="renameSummary"></div>
+                <div class="result-list" id="renameResultList"></div>
+            </div>
+        </div>
+
+        <!-- ====== 标签②：打包压缩 ====== -->
+        <div class="tab-panel" id="panel-zip">
+
+            <div class="upload-zone" id="uploadZoneZip">
+                <div class="upload-placeholder">
+                    <div class="upload-icon">&#128228;</div>
+                    <div class="upload-text">点击或拖拽上传需要打包的文件</div>
+                    <div class="upload-hint" id="zipHint">支持任意格式，可多选</div>
+                </div>
+                <div class="upload-file-list" id="zipFileList"></div>
+            </div>
+
+            <div class="param-group">
+                <div class="param-item">
+                    <label>压缩包名称（不含后缀）</label>
+                    <input type="text" id="zipName" placeholder="例如：资料打包" maxlength="50" value="">
+                    <small>不填则默认 "archive"</small>
+                </div>
+            </div>
+
+            <button class="btn-process" id="btnZip" disabled>&#9889; 开始打包</button>
+
+            <div class="result-section" id="zipResult">
+                <div class="result-title">&#9989; 打包结果</div>
+                <div class="result-summary" id="zipSummary"></div>
+                <a class="btn-download-main" id="btnZipDownload" href="#" target="_blank">&#128229; 下载 ZIP 文件</a>
+            </div>
+        </div>
+
+        <!-- ====== 标签③：解压文件 ====== -->
+        <div class="tab-panel" id="panel-unzip">
+
+            <div class="upload-zone" id="uploadZoneUnzip">
+                <div class="upload-placeholder">
+                    <div class="upload-icon">&#128228;</div>
+                    <div class="upload-text">点击或拖拽上传 .zip 压缩包</div>
+                    <div class="upload-hint" id="unzipHint">仅支持 .zip 格式，单文件最大 200MB</div>
+                </div>
+                <div class="upload-file-list" id="unzipFileList"></div>
+            </div>
+
+            <button class="btn-process" id="btnUnzip" disabled>&#9889; 开始解压</button>
+
+            <div class="result-section" id="unzipResult">
+                <div class="result-title">&#9989; 解压结果</div>
+                <div class="result-summary" id="unzipSummary"></div>
+                <div class="result-list" id="unzipResultList"></div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<!-- Toast 容器 + common.js -->
+<div id="toast-container" class="toast-container"></div>
+<script src="/static/js/common.js"></script>
+
+<script>
+/* ================================================================
+ * 文件工具箱 - 前端交互逻辑
+ * ================================================================ */
+(function () {
+    // ===== 状态 =====
+    let activeTab = "rename";
+    let renameFiles = [];
+    let zipFiles = [];
+    let unzipFile = null;
+
+    // ===== Tab 切换 =====
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+            document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+            btn.classList.add("active");
+            activeTab = btn.dataset.tab;
+            document.getElementById("panel-" + activeTab).classList.add("active");
+            document.querySelectorAll(".result-section").forEach(s => s.classList.remove("show"));
+        });
+    });
+
+    // ===== 上传区：重命名 =====
+    const uzoneRename = document.getElementById("uploadZoneRename");
+    const renameUploader = initUploadZone(uzoneRename, {
+        accept: "*",
+        multiple: true,
+        maxFileSizeMB: 50,
+        onFilesSelected(files) {
+            renameFiles = files;
+            renderFileList(renameFiles, "renameFileList", uzoneRename);
+            updateRenameBtn();
+        },
+    });
+    uzoneRename.addEventListener("dblclick", () => { renameFiles = []; renderFileList([], "renameFileList", uzoneRename); updateRenameBtn(); });
+
+    // ===== 上传区：打包 =====
+    const uzoneZip = document.getElementById("uploadZoneZip");
+    const zipUploader = initUploadZone(uzoneZip, {
+        accept: "*",
+        multiple: true,
+        maxFileSizeMB: 50,
+        onFilesSelected(files) {
+            zipFiles = files;
+            renderFileList(zipFiles, "zipFileList", uzoneZip);
+            updateZipBtn();
+        },
+    });
+    uzoneZip.addEventListener("dblclick", () => { zipFiles = []; renderFileList([], "zipFileList", uzoneZip); updateZipBtn(); });
+
+    // ===== 上传区：解压 =====
+    const uzoneUnzip = document.getElementById("uploadZoneUnzip");
+    const unzipUploader = initUploadZone(uzoneUnzip, {
+        accept: ".zip",
+        multiple: false,
+        maxFileSizeMB: 200,
+        onFilesSelected(files) {
+            unzipFile = files[0] || null;
+            renderFileList(unzipFile ? [unzipFile] : [], "unzipFileList", uzoneUnzip);
+            updateUnzipBtn();
+        },
+    });
+    uzoneUnzip.addEventListener("dblclick", () => { unzipFile = null; renderFileList([], "unzipFileList", uzoneUnzip); updateUnzipBtn(); });
+
+    // ===== 文件列表渲染 =====
+    function renderFileList(files, listId, zone) {
+        const el = document.getElementById(listId);
+        if (!files.length) {
+            el.innerHTML = "";
+            zone.classList.remove("has-file");
+            return;
+        }
+        zone.classList.add("has-file");
+        el.innerHTML = files.map(f =>
+            '<div class="file-item">' + escapeHtml(f.name) +
+            ' <span class="file-size">' + formatFileSize(f.size) + '</span></div>'
+        ).join("");
+        if (files.length > 5) {
+            el.innerHTML += '<div style="color:#94A3B8;font-size:12px;margin-top:4px;">...共 ' + files.length + ' 个文件</div>';
+        }
+    }
+
+    // ===== 按钮状态 =====
+    function updateRenameBtn() {
+        document.getElementById("btnRename").disabled = renameFiles.length === 0;
+    }
+    function updateZipBtn() {
+        document.getElementById("btnZip").disabled = zipFiles.length === 0;
+    }
+    function updateUnzipBtn() {
+        document.getElementById("btnUnzip").disabled = !unzipFile;
+    }
+
+    // ===== 批量重命名 =====
+    document.getElementById("btnRename").addEventListener("click", async () => {
+        const prefix = document.getElementById("renamePrefix").value.trim();
+        const startNum = parseInt(document.getElementById("renameStartNum").value, 10) || 1;
+        if (!prefix) { Toast.warning("请输入文件名前缀"); return; }
+
+        const formData = new FormData();
+        formData.append("prefix", prefix);
+        formData.append("start_num", startNum);
+        renameFiles.forEach(f => formData.append("files", f));
+
+        toggleLoading(true, "重命名中...");
+        hideResult("renameResult");
+
+        try {
+            const res = await API.upload("/api/file/rename", formData);
+            if (res.ok && res.data?.ok) {
+                const d = res.data.data;
+                document.getElementById("renameSummary").innerHTML =
+                    "成功重命名 <strong>" + d.count + "</strong> 个文件，前缀：<strong>" + escapeHtml(prefix) + "</strong>";
+                let html = '<table><tr><th>原名</th><th>新文件名</th><th>下载</th></tr>';
+                d.files.forEach(f => {
+                    html += '<tr><td>' + escapeHtml(f.original) + '</td><td>' + escapeHtml(f.renamed) + '</td><td><a class="dl-link" href="' + f.download_url + '" download>&#128229; 下载</a></td></tr>';
+                });
+                html += '</table>';
+                document.getElementById("renameResultList").innerHTML = html;
+                document.getElementById("renameResult").classList.add("show");
+                Toast.success(res.data.message);
+            } else {
+                Toast.error(res.data?.error || "重命名失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // ===== 打包压缩 =====
+    document.getElementById("btnZip").addEventListener("click", async () => {
+        const zipName = document.getElementById("zipName").value.trim() || "archive";
+
+        const formData = new FormData();
+        formData.append("zip_name", zipName);
+        zipFiles.forEach(f => formData.append("files", f));
+
+        toggleLoading(true, "打包中...");
+        hideResult("zipResult");
+
+        try {
+            const res = await API.upload("/api/file/zip", formData);
+            if (res.ok && res.data?.ok) {
+                const d = res.data.data;
+                document.getElementById("zipSummary").innerHTML =
+                    "打包完成：<strong>" + d.file_count + "</strong> 个文件，大小 <strong>" + d.size_mb + " MB</strong>";
+                const btn = document.getElementById("btnZipDownload");
+                btn.href = d.download_url;
+                btn.download = d.zip_filename;
+                document.getElementById("zipResult").classList.add("show");
+                Toast.success(res.data.message);
+            } else {
+                Toast.error(res.data?.error || "打包失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // ===== 解压 =====
+    document.getElementById("btnUnzip").addEventListener("click", async () => {
+        const formData = new FormData();
+        formData.append("file", unzipFile);
+
+        toggleLoading(true, "解压中...");
+        hideResult("unzipResult");
+
+        try {
+            const res = await API.upload("/api/file/unzip", formData);
+            if (res.ok && res.data?.ok) {
+                const d = res.data.data;
+                document.getElementById("unzipSummary").innerHTML =
+                    "解压完成：共 <strong>" + d.file_count + "</strong> 个文件，总大小 <strong>" + d.total_size_mb + " MB</strong>";
+                let html = '<table><tr><th>文件名</th><th>大小</th><th>操作</th></tr>';
+                d.files.forEach(f => {
+                    if (f.error) {
+                        html += '<tr><td>' + escapeHtml(f.filename) + '</td><td>' + f.size_mb + ' MB</td><td style="color:#EF4444;">' + f.error + '</td></tr>';
+                    } else {
+                        html += '<tr><td>' + escapeHtml(f.filename) + '</td><td>' + f.size_mb + ' MB</td><td><a class="dl-link" href="' + f.download_url + '" download>&#128229; 下载</a></td></tr>';
+                    }
+                });
+                html += '</table>';
+                document.getElementById("unzipResultList").innerHTML = html;
+                document.getElementById("unzipResult").classList.add("show");
+                Toast.success(res.data.message);
+            } else {
+                Toast.error(res.data?.error || "解压失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // ===== 辅助 =====
+    function hideResult(sectionId) {
+        document.getElementById(sectionId).classList.remove("show");
+    }
+
+})();
+</script>
+
+</body>
+</html>
