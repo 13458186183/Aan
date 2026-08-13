@@ -1,8 +1,8 @@
 """
 FieldKit - 一站式 Web 工具箱 项目入口
 ======================================
-基于 FastAPI 构建，提供图片处理、文件工具箱、拼豆图纸转换等 Web 服务；
-考勤点名、资产清查、测绘水印等模块还在搭建中。
+基于 FastAPI 构建，提供图片处理、文件工具箱、拼豆图纸转换、考勤点名、
+测绘 EXIF 水印、村级资产清查表等 Web 服务。
 
 启动方式：
     uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
 # ============================================================
 app = FastAPI(
     title="FieldKit - 一站式 Web 工具箱",
-    description="提供图片处理、文件工具箱、拼豆图纸转换等 Web 服务",
+    description="提供图片处理、文件工具箱、拼豆图纸转换、考勤点名、测绘 EXIF 水印、村级资产清查表等 Web 服务",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",       # Swagger UI 文档地址
@@ -121,6 +121,12 @@ from routes.file_tool import router as file_router
 app.include_router(file_router)
 from routes.bead_tool import router as bead_router
 app.include_router(bead_router)
+from routes.attendance_tool import router as attendance_router
+app.include_router(attendance_router)
+from routes.survey_tool import router as survey_router
+app.include_router(survey_router)
+from routes.asset_tool import router as asset_router
+app.include_router(asset_router)
 
 
 

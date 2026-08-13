@@ -5,19 +5,492 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>村级资产清查表工具 - FieldKit</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        :root {
+            /* 与首页色调一致（淡粉色系） */
+            --primary: #D89DB5;
+            --primary-hover: #C48A9F;
+            --primary-light: #FBF0F4;
+            --primary-border: #F0DCE6;
+            --gray-bg: #F8F9FA;
+            --gray-text: #64748B;
+            --radius: 10px;
+        }
+        body { background: var(--gray-bg); min-height: 100vh; }
+
+        .tool-header {
+            background: #fff; border-bottom: 1px solid #E2E8F0;
+            padding: 0 32px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .tool-header .back-link { color: var(--primary); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+        .tool-header .back-link:hover { color: var(--primary-hover); }
+        .tool-header .tool-title { font-size: 18px; font-weight: 600; color: #1E293B; }
+        .tool-header .header-spacer { width: 80px; }
+
+        .tool-main { max-width: 1080px; margin: 28px auto; padding: 0 20px; }
+
+        .card {
+            background: #fff; border: 1px solid #E2E8F0;
+            border-radius: var(--radius); padding: 24px; margin-bottom: 18px;
+        }
+        .card h3 { font-size: 15px; font-weight: 600; color: #1E293B; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid var(--primary-border); }
+
+        /* ===== 步骤条 ===== */
+        .steps { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .step {
+            flex: 1; min-width: 150px; padding: 12px 14px; border-radius: 8px;
+            background: #fff; border: 1px solid #E2E8F0; font-size: 13px; color: #94A3B8;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .step .step-num {
+            width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+            background: #E2E8F0; color: #fff; font-size: 12px; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .step.active { border-color: var(--primary); color: #1E293B; font-weight: 600; }
+        .step.active .step-num { background: var(--primary); }
+        .step.done { border-color: #B7E4C7; color: #16A34A; }
+        .step.done .step-num { background: #16A34A; }
+
+        /* ===== 上传区 ===== */
+        .upload-zone {
+            border: 2px dashed #CBD5E1; border-radius: var(--radius);
+            padding: 30px 20px; text-align: center; cursor: pointer;
+            transition: all 0.25s; background: #FAFBFC;
+        }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); background: var(--primary-light); }
+        .upload-zone.has-file { border-style: solid; border-color: var(--primary); background: #FDFAFB; }
+        .upload-icon { font-size: 36px; margin-bottom: 6px; }
+        .upload-text { font-size: 14px; color: var(--gray-text); }
+        .upload-hint { font-size: 12px; color: #94A3B8; margin-top: 6px; }
+        .upload-file-list { font-size: 13px; color: var(--primary); margin-top: 10px; text-align: left; max-height: 120px; overflow-y: auto; line-height: 1.8; }
+        .upload-file-list .file-item { padding: 2px 6px; border-radius: 4px; }
+        .upload-file-list .file-item:nth-child(odd) { background: #F1F5F9; }
+        .upload-file-list .file-size { color: #94A3B8; margin-left: 8px; font-size: 12px; }
+        .upload-zone:not(.has-file) .upload-file-list { display: none; }
+
+        /* ===== 按钮 ===== */
+        .btn-process {
+            width: 100%; padding: 12px; background: var(--primary); color: #fff;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s; margin-top: 18px;
+        }
+        .btn-process:hover { background: var(--primary-hover); }
+        .btn-process:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-row { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+        .btn-row .btn-process { width: auto; flex: 1; min-width: 140px; margin-top: 0; }
+        .btn-primary {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 10px 24px; background: var(--primary); color: #fff; border: none; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.2s;
+        }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-outline {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 10px 24px; background: #fff; color: var(--primary); border: 1px solid var(--primary); border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; transition: all 0.2s;
+        }
+        .btn-outline:hover { background: var(--primary-light); }
+
+        /* ===== 统计条 ===== */
+        .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .stat-item { background: #FAFBFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; text-align: center; }
+        .stat-item .sv { font-size: 22px; font-weight: 700; color: #1E293B; }
+        .stat-item .sl { font-size: 12px; color: var(--gray-text); margin-top: 3px; }
+        .stat-item.ok .sv { color: #16A34A; }
+        .stat-item.err .sv { color: #DC2626; }
+
+        /* ===== 错误列表 ===== */
+        .error-box { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
+        .error-box h4 { margin: 0 0 8px; font-size: 13px; color: #B91C1C; }
+        .error-box ul { margin: 0; padding-left: 18px; font-size: 13px; color: #991B1B; line-height: 1.9; max-height: 220px; overflow-y: auto; }
+
+        /* ===== 表格 ===== */
+        .table-wrap { overflow-x: auto; border: 1px solid #E2E8F0; border-radius: 8px; max-height: 420px; overflow-y: auto; }
+        table.data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+        table.data-table th {
+            background: var(--primary); color: #fff; font-weight: 600;
+            padding: 8px 10px; position: sticky; top: 0; z-index: 2; text-align: center;
+        }
+        table.data-table td { padding: 7px 10px; border-bottom: 1px solid #F1F5F9; text-align: center; }
+        table.data-table tr:nth-child(even) td { background: #FAFBFC; }
+        table.data-table tr.row-error td { background: #FEF2F2; }
+        table.data-table tr.row-error td:first-child::after {
+            content: " ⚠"; color: #DC2626; font-weight: 700;
+        }
+        .cell-error { color: #DC2626; font-weight: 600; }
+
+        /* ===== 汇总表 ===== */
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .summary-table th { background: #F1F5F9; color: #334155; font-weight: 600; padding: 9px 12px; border-bottom: 1px solid #E2E8F0; text-align: center; }
+        .summary-table td { padding: 8px 12px; border-bottom: 1px solid #F1F5F9; text-align: center; }
+        .summary-table tr.total-row td { background: var(--primary-light); font-weight: 700; color: #1E293B; }
+
+        /* ===== 表单 ===== */
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+        .form-item { display: flex; flex-direction: column; gap: 6px; }
+        .form-item label { font-size: 13px; font-weight: 600; color: #334155; }
+        .form-item .field-hint { font-size: 11px; color: #94A3B8; }
+        .form-item input {
+            border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px;
+            font-size: 14px; color: #1E293B; outline: none; transition: border-color 0.2s;
+            font-family: inherit; width: 100%; box-sizing: border-box; background: #fff;
+        }
+        .form-item input:focus { border-color: var(--primary); }
+        .form-item.full { grid-column: 1 / -1; }
+
+        .section-hint { font-size: 13px; color: var(--gray-text); line-height: 1.8; margin: 0 0 14px; }
+        .highlight { color: var(--primary); font-weight: 600; }
+
+        @media (max-width: 640px) {
+            .tool-main { padding: 0 12px; }
+            .card { padding: 16px; }
+        }
+    </style>
 </head>
 <body>
-    <main class="main-container">
-        <div class="page-header">
-            <a href="/static/index.html" class="page-back">&larr; 返回首页</a>
-            <h1 class="page-title">村级资产清查表工具</h1>
+
+<!-- ====== 顶部导航 ====== -->
+<header class="tool-header">
+    <a href="/static/index.html" class="back-link">&#8592; 返回首页</a>
+    <span class="tool-title">&#127968; 村级资产清查表工具</span>
+    <span class="header-spacer"></span>
+</header>
+
+<!-- ====== 主内容 ====== -->
+<main class="tool-main">
+
+    <!-- 步骤条 -->
+    <div class="steps">
+        <div class="step active" id="step1"><span class="step-num">1</span>下载模板</div>
+        <div class="step" id="step2"><span class="step-num">2</span>上传校验</div>
+        <div class="step" id="step3"><span class="step-num">3</span>汇总导出</div>
+    </div>
+
+    <!-- 1. 下载模板 -->
+    <div class="card" id="card1">
+        <h3>&#128196; 下载标准模板</h3>
+        <p class="section-hint">
+            模板包含「资产清查表」Sheet（标题 + 填表说明 + 表头 + 示例行 + <span class="highlight">资产类别下拉</span>）
+            和「资产类别」Sheet。请使用模板填报数据后上传校验。
+        </p>
+        <div class="btn-row">
+            <a class="btn-primary" href="/api/asset/template" download>&#128229; 下载标准模板（xlsx）</a>
         </div>
-        <div class="card" style="text-align:center; padding: 80px 0; color: var(--color-text-muted);">
-            <p style="font-size:48px; margin-bottom:16px;">&#128202;</p>
-            <p>模块开发中，敬请期待...</p>
+        <p class="section-hint" style="margin-top:14px;font-size:12px;color:#94A3B8;">
+            模板字段：序号、资产类别、资产名称、计量单位、账面数量/金额、清查数量/金额、盘盈数量/金额、盘亏数量/金额、备注。
+            校验规则：类别必选下拉值、数量金额必须为数字、清查数 = 账面数 + 盘盈 - 盘亏。
+        </p>
+    </div>
+
+    <!-- 2. 上传校验 -->
+    <div class="card" id="card2">
+        <h3>&#128228; 上传填报数据并校验</h3>
+        <div class="upload-zone" id="uploadZone">
+            <div class="upload-placeholder">
+                <div class="upload-icon">&#128444;</div>
+                <div class="upload-text">点击或拖拽上传填好的资产清查表</div>
+                <div class="upload-hint">支持 xlsx / xls，单文件最大 10MB</div>
+            </div>
+            <div class="upload-file-list" id="fileList"></div>
         </div>
-    </main>
-    <div id="toast-container" class="toast-container"></div>
-    <script src="/static/js/common.js"></script>
+        <button class="btn-process" id="btnParse" disabled>&#9989; 解析并校验</button>
+    </div>
+
+    <!-- 3. 校验结果 -->
+    <div class="card" id="card3" style="display:none;">
+        <h3>&#128202; 校验结果</h3>
+
+        <div class="stats-bar">
+            <div class="stat-item"><div class="sv" id="stTotal">0</div><div class="sl">资产总条数</div></div>
+            <div class="stat-item ok"><div class="sv" id="stValid">0</div><div class="sl">校验通过</div></div>
+            <div class="stat-item err"><div class="sv" id="stInvalid">0</div><div class="sl">存在错误</div></div>
+        </div>
+
+        <div class="error-box" id="errorBox" style="display:none;">
+            <h4>&#9888; 发现数据错误</h4>
+            <ul id="errorList"></ul>
+        </div>
+
+        <div class="table-wrap">
+            <table class="data-table" id="dataTable">
+                <thead>
+                <tr>
+                    <th>序号</th><th>资产类别</th><th>资产名称</th><th>计量单位</th>
+                    <th>账面数量</th><th>账面金额</th><th>清查数量</th><th>清查金额</th>
+                    <th>盘盈数量</th><th>盘盈金额</th><th>盘亏数量</th><th>盘亏金额</th><th>备注</th>
+                </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn-outline" id="btnBack">&#8630; 返回修改</button>
+            <button class="btn-primary" id="btnNext">继续：生成汇总表 &rarr;</button>
+        </div>
+    </div>
+
+    <!-- 4. 汇总导出 -->
+    <div class="card" id="card4" style="display:none;">
+        <h3>&#128230; 生成汇总统计表</h3>
+        <div class="form-grid">
+            <div class="form-item">
+                <label>村名 / 表名</label>
+                <input type="text" id="inTitle" placeholder="如：XX村集体经济组织资产清查表">
+                <span class="field-hint">用于汇总表标题与文件名，可留空</span>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button class="btn-primary" id="btnExport">&#128229; 生成汇总统计表</button>
+        </div>
+
+        <div id="summaryArea" style="display:none; margin-top:20px;">
+            <h4 style="font-size:14px;color:#334155;margin:0 0 10px;">&#128202; 类别汇总预览</h4>
+            <table class="summary-table">
+                <thead>
+                <tr>
+                    <th>资产类别</th><th>条目数</th><th>账面金额(元)</th><th>清查金额(元)</th>
+                    <th>盘盈金额(元)</th><th>盘亏金额(元)</th><th>差额(清查-账面)</th>
+                </tr>
+                </thead>
+                <tbody id="summaryBody"></tbody>
+            </table>
+            <div class="btn-row">
+                <a class="btn-primary" id="btnDownload" href="#" target="_blank">&#11015; 下载汇总统计表（xlsx）</a>
+                <button class="btn-outline" id="btnRestart">&#8630; 重新开始</button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="/static/js/common.js"></script>
+
+<script>
+(function () {
+    let selectedFile = null;
+    let sessionId = null;
+    let parseResult = null;
+
+    // ===== 上传区 =====
+    const uzone = document.getElementById("uploadZone");
+    initUploadZone(uzone, {
+        accept: ".xlsx,.xls",
+        multiple: false,
+        maxFileSizeMB: 10,
+        onFilesSelected(files) {
+            selectedFile = files[0];
+            renderFileList();
+            document.getElementById("btnParse").disabled = false;
+        },
+    });
+    uzone.addEventListener("dblclick", () => {
+        selectedFile = null;
+        renderFileList();
+        document.getElementById("btnParse").disabled = true;
+    });
+
+    function renderFileList() {
+        const el = document.getElementById("fileList");
+        if (!selectedFile) {
+            el.innerHTML = "";
+            uzone.classList.remove("has-file");
+            return;
+        }
+        uzone.classList.add("has-file");
+        el.innerHTML = '<div class="file-item">' + escapeHtml(selectedFile.name) +
+            ' <span class="file-size">' + formatFileSize(selectedFile.size) + '</span></div>';
+    }
+
+    function setStep(n) {
+        for (let i = 1; i <= 4; i++) {
+            const el = document.getElementById("step" + i);
+            if (!el) continue;
+            el.classList.remove("active", "done");
+            if (i < n) el.classList.add("done");
+            if (i === n) el.classList.add("active");
+        }
+    }
+
+    // ===== 解析校验 =====
+    document.getElementById("btnParse").addEventListener("click", async () => {
+        if (!selectedFile) { Toast.warning("请先选择清查表文件"); return; }
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+
+        toggleLoading(true, "正在解析并校验...");
+        try {
+            const res = await API.upload("/api/asset/parse", formData);
+            const data = res.data;
+            if (data && data.ok) {
+                parseResult = data.data;
+                sessionId = data.data.session_id;
+                renderResult(data.data);
+                setStep(3);
+                Toast.success(data.message);
+            } else {
+                Toast.error(data?.error || "校验失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // ===== 渲染校验结果 =====
+    function renderResult(d) {
+        const stats = d.stats;
+        document.getElementById("stTotal").textContent = stats.total;
+        document.getElementById("stValid").textContent = stats.valid;
+        document.getElementById("stInvalid").textContent = stats.invalid;
+
+        // 错误列表
+        const errorBox = document.getElementById("errorBox");
+        const errorList = document.getElementById("errorList");
+        if (d.errors && d.errors.length) {
+            errorBox.style.display = "block";
+            errorList.innerHTML = d.errors.map(e => "<li>" + escapeHtml(e) + "</li>").join("");
+        } else {
+            errorBox.style.display = "none";
+            errorList.innerHTML = "";
+        }
+
+        // 明细表
+        const errFields = collectErrorFields(d.records);
+        document.getElementById("tableBody").innerHTML = d.records.map((r, i) => {
+            const hasErr = r.errors && r.errors.length;
+            const cls = hasErr ? ' class="row-error"' : "";
+            const fieldErr = errFields[i] || {};
+            function td(field, value) {
+                const mark = fieldErr[field] ? ' class="cell-error"' : "";
+                return "<td" + mark + ">" + escapeHtml(value || "") + "</td>";
+            }
+            return "<tr" + cls + ">" +
+                "<td>" + escapeHtml(r.seq || (i + 1)) + "</td>" +
+                td("category", r.category) + td("name", r.name) + td("unit", r.unit) +
+                td("book_qty", r.book_qty) + td("book_amt", r.book_amt) +
+                td("check_qty", r.check_qty) + td("check_amt", r.check_amt) +
+                td("surplus_qty", r.surplus_qty) + td("surplus_amt", r.surplus_amt) +
+                td("deficit_qty", r.deficit_qty) + td("deficit_amt", r.deficit_amt) +
+                td("remark", r.remark) +
+                "</tr>";
+        }).join("");
+
+        document.getElementById("card3").style.display = "block";
+        document.getElementById("card4").style.display = "none";
+        document.getElementById("card3").scrollIntoView({ behavior: "smooth" });
+    }
+
+    // 从错误文本推断是哪个字段出错（用于表格中高亮对应单元格）
+    function collectErrorFields(records) {
+        const map = {};
+        const fieldMap = {
+            "资产类别": "category", "资产名称": "name",
+            "账面数量": "book_qty", "账面金额": "book_amt",
+            "清查数量": "check_qty", "清查金额": "check_amt",
+            "盘盈数量": "surplus_qty", "盘盈金额": "surplus_amt",
+            "盘亏数量": "deficit_qty", "盘亏金额": "deficit_amt",
+        };
+        records.forEach((r, i) => {
+            if (!r.errors || !r.errors.length) return;
+            const tags = {};
+            r.errors.forEach(e => {
+                for (const k in fieldMap) {
+                    if (e.includes(k)) tags[fieldMap[k]] = true;
+                }
+            });
+            if (Object.keys(tags).length) map[i] = tags;
+        });
+        return map;
+    }
+
+    // ===== 返回修改 =====
+    document.getElementById("btnBack").addEventListener("click", () => {
+        document.getElementById("card3").style.display = "none";
+        setStep(2);
+        document.getElementById("card2").scrollIntoView({ behavior: "smooth" });
+    });
+
+    // ===== 继续生成汇总表 =====
+    document.getElementById("btnNext").addEventListener("click", () => {
+        document.getElementById("card3").style.display = "none";
+        document.getElementById("card4").style.display = "block";
+        setStep(4);
+        document.getElementById("card4").scrollIntoView({ behavior: "smooth" });
+    });
+
+    // ===== 生成汇总统计表 =====
+    document.getElementById("btnExport").addEventListener("click", async () => {
+        if (!sessionId) { Toast.warning("请先上传并校验清查表"); return; }
+        const formData = new FormData();
+        formData.append("session_id", sessionId);
+        formData.append("title", document.getElementById("inTitle").value.trim());
+
+        toggleLoading(true, "正在生成汇总统计表...");
+        try {
+            const res = await API.upload("/api/asset/export", formData);
+            const data = res.data;
+            if (data && data.ok) {
+                const d = data.data;
+                renderSummary(d);
+                Toast.success(data.message);
+            } else {
+                Toast.error(data?.error || "生成失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    function renderSummary(d) {
+        document.getElementById("summaryBody").innerHTML = d.summary.rows.map(r =>
+            "<tr>" +
+            "<td>" + escapeHtml(r.category) + "</td>" +
+            "<td>" + r.count + "</td>" +
+            "<td>" + fmtNum(r.book_amt) + "</td>" +
+            "<td>" + fmtNum(r.check_amt) + "</td>" +
+            "<td>" + fmtNum(r.surplus_amt) + "</td>" +
+            "<td>" + fmtNum(r.deficit_amt) + "</td>" +
+            "<td>" + fmtNum(r.diff_amt) + "</td>" +
+            "</tr>"
+        ).join("") +
+        "<tr class='total-row'>" +
+        "<td>合计</td>" +
+        "<td>" + d.summary.total.count + "</td>" +
+        "<td>" + fmtNum(d.summary.total.book_amt) + "</td>" +
+        "<td>" + fmtNum(d.summary.total.check_amt) + "</td>" +
+        "<td>" + fmtNum(d.summary.total.surplus_amt) + "</td>" +
+        "<td>" + fmtNum(d.summary.total.deficit_amt) + "</td>" +
+        "<td>" + fmtNum(d.summary.total.diff_amt) + "</td>" +
+        "</tr>";
+
+        const dl = document.getElementById("btnDownload");
+        dl.href = d.download_url;
+        dl.download = d.filename;
+
+        document.getElementById("summaryArea").style.display = "block";
+        document.getElementById("summaryArea").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function fmtNum(v) {
+        if (v === undefined || v === null || v === "") return "";
+        const n = Number(v);
+        return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+    }
+
+    // ===== 重新开始 =====
+    document.getElementById("btnRestart").addEventListener("click", () => {
+        location.reload();
+    });
+})();
+</script>
+
 </body>
 </html>

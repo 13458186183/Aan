@@ -21,10 +21,10 @@ DEFAULT_MAX_SIZE_BYTES = DEFAULT_MAX_SIZE_MB * 1024 * 1024
 ALLOWED_EXTENSIONS: Dict[str, List[str]] = {
     # 图片处理工具
     "image": ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif", "svg"],
-    # 考勤点名工具
-    "attendance": ["jpg", "jpeg", "png", "pdf"],
+    # 考勤点名工具（花名册 xlsx/csv + 合照图片）
+    "attendance": ["xlsx", "csv", "jpg", "jpeg", "png", "webp", "gif", "bmp"],
     # 测绘 EXIF 水印工具（原始照片格式）
-    "survey": ["jpg", "jpeg", "tiff", "tif", "png"],
+    "survey": ["jpg", "jpeg", "tiff", "tif", "png", "bmp", "webp"],
     # 村级资产清查表工具
     "asset": ["xlsx", "xls"],
     # 拼豆图纸转换工具

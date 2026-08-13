@@ -1,30 +1,293 @@
-"""<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<title>测绘 EXIF 水印工具 - FieldKit</title>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-         background: #FAF7F9; color: #3D2C35; margin: 0; padding: 40px 20px; }
-  .box { max-width: 600px; margin: 0 auto; background: #FFF; border-radius: 14px;
-          padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,.06); text-align: center; }
-  h1   { font-size: 20px; margin: 0 0 12px; color: #C07898; }
-  p    { font-size: 14px; color: #8A7A82; line-height: 1.7; margin: 8px 0; }
-  .tag { display: inline-block; padding: 4px 10px; background: #FCE7F3;
-         color: #C07898; border-radius: 6px; font-size: 12px; margin-top: 16px; }
-  a.back { display: inline-block; margin-top: 24px; padding: 8px 20px;
-           background: #D89DB5; color: #FFF; border-radius: 8px;
-           text-decoration: none; font-size: 14px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测绘 EXIF 水印工具 - FieldKit</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        :root {
+            /* 与首页色调一致（淡粉色系） */
+            --primary: #D89DB5;
+            --primary-hover: #C48A9F;
+            --primary-light: #FBF0F4;
+            --primary-border: #F0DCE6;
+            --gray-bg: #F8F9FA;
+            --gray-text: #64748B;
+            --radius: 10px;
+        }
+        body { background: var(--gray-bg); min-height: 100vh; }
+
+        .tool-header {
+            background: #fff; border-bottom: 1px solid #E2E8F0;
+            padding: 0 32px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .tool-header .back-link { color: var(--primary); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+        .tool-header .back-link:hover { color: var(--primary-hover); }
+        .tool-header .tool-title { font-size: 18px; font-weight: 600; color: #1E293B; }
+        .tool-header .header-spacer { width: 80px; }
+
+        .tool-main { max-width: 960px; margin: 28px auto; padding: 0 20px; }
+
+        .card {
+            background: #fff; border: 1px solid #E2E8F0;
+            border-radius: var(--radius); padding: 24px; margin-bottom: 18px;
+        }
+        .card h3 { font-size: 15px; font-weight: 600; color: #1E293B; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid var(--primary-border); }
+
+        /* ===== 上传区 ===== */
+        .upload-zone {
+            border: 2px dashed #CBD5E1; border-radius: var(--radius);
+            padding: 30px 20px; text-align: center; cursor: pointer;
+            transition: all 0.25s; background: #FAFBFC;
+        }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); background: var(--primary-light); }
+        .upload-zone.has-file { border-style: solid; border-color: var(--primary); background: #FDFAFB; }
+        .upload-icon { font-size: 36px; margin-bottom: 6px; }
+        .upload-text { font-size: 14px; color: var(--gray-text); }
+        .upload-hint { font-size: 12px; color: #94A3B8; margin-top: 6px; }
+        .upload-file-list { font-size: 13px; color: var(--primary); margin-top: 10px; text-align: left; max-height: 120px; overflow-y: auto; line-height: 1.8; }
+        .upload-file-list .file-item { padding: 2px 6px; border-radius: 4px; }
+        .upload-file-list .file-item:nth-child(odd) { background: #F1F5F9; }
+        .upload-file-list .file-size { color: #94A3B8; margin-left: 8px; font-size: 12px; }
+        .upload-zone:not(.has-file) .upload-file-list { display: none; }
+
+        /* ===== 表单 ===== */
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+        .form-item { display: flex; flex-direction: column; gap: 6px; }
+        .form-item label { font-size: 13px; font-weight: 600; color: #334155; }
+        .form-item .field-hint { font-size: 11px; color: #94A3B8; }
+        .form-item input, .form-item textarea {
+            border: 1px solid #E2E8F0; border-radius: 8px; padding: 9px 12px;
+            font-size: 14px; color: #1E293B; outline: none; transition: border-color 0.2s;
+            font-family: inherit; width: 100%; box-sizing: border-box; background: #fff;
+        }
+        .form-item input:focus, .form-item textarea:focus { border-color: var(--primary); }
+        .form-item textarea { min-height: 72px; resize: vertical; }
+        .form-item.full { grid-column: 1 / -1; }
+
+        /* ===== 按钮 ===== */
+        .btn-process {
+            width: 100%; padding: 12px; background: var(--primary); color: #fff;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s; margin-top: 18px;
+        }
+        .btn-process:hover { background: var(--primary-hover); }
+        .btn-process:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-download-main {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 16px; padding: 10px 24px;
+            background: var(--primary); color: #fff; border: none; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.2s;
+        }
+        .btn-download-main:hover { background: var(--primary-hover); }
+
+        /* ===== 结果 ===== */
+        .result-summary { font-size: 14px; color: var(--gray-text); line-height: 2; margin-bottom: 12px; }
+        .result-summary strong { color: var(--primary); }
+        .result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+        .result-item { border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; background: #FAFBFC; }
+        .result-item img { width: 100%; height: 120px; object-fit: cover; display: block; background: #E2E8F0; }
+        .result-item .ri-body { padding: 8px 10px; }
+        .result-item .ri-name { font-size: 12px; color: #334155; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .result-item .ri-info { font-size: 11px; color: #94A3B8; margin-top: 3px; line-height: 1.6; word-break: break-all; }
+        .result-item .ri-status { font-size: 11px; font-weight: 600; margin-top: 4px; }
+        .result-item.ok .ri-status { color: #16A34A; }
+        .result-item.err .ri-status { color: #DC2626; }
+        .result-item .ri-dl { display: block; margin-top: 6px; font-size: 12px; color: var(--primary); text-decoration: none; }
+        .result-item .ri-dl:hover { color: var(--primary-hover); }
+
+        @media (max-width: 640px) {
+            .tool-main { padding: 0 12px; }
+            .card { padding: 16px; }
+        }
+    </style>
 </head>
 <body>
-<div class="box">
-  <h1>测绘 EXIF 水印工具</h1>
-  <p>为测绘外业照片批量写入 GPS 坐标、拍摄时间、设备型号等元数据水印，</p>
-  <p>支持保留原始 EXIF 信息，便于后续成果归档与溯源。</p>
-  <span class="tag">筹备中</span>
-  <br>
-  <a class="back" href="/static/index.html">返回首页</a>
-</div>
+
+<!-- ====== 顶部导航 ====== -->
+<header class="tool-header">
+    <a href="/static/index.html" class="back-link">&#8592; 返回首页</a>
+    <span class="tool-title">&#127757; 测绘 EXIF 水印工具</span>
+    <span class="header-spacer"></span>
+</header>
+
+<!-- ====== 主内容 ====== -->
+<main class="tool-main">
+
+    <!-- 1. 上传照片 -->
+    <div class="card">
+        <h3>&#128247; 上传外业照片</h3>
+        <div class="upload-zone" id="uploadZone">
+            <div class="upload-placeholder">
+                <div class="upload-icon">&#128444;</div>
+                <div class="upload-text">点击或拖拽上传照片（可多张，批量处理）</div>
+                <div class="upload-hint">支持 jpg / tiff / png / bmp / webp，单张最大 30MB</div>
+            </div>
+            <div class="upload-file-list" id="fileList"></div>
+        </div>
+    </div>
+
+    <!-- 2. 水印信息 -->
+    <div class="card">
+        <h3>&#9998; 水印信息 <small style="color:#94A3B8;font-weight:400;font-size:12px;">（留空的项将保留照片原始 EXIF 信息）</small></h3>
+        <div class="form-grid">
+            <div class="form-item">
+                <label>纬度 Latitude</label>
+                <input type="text" id="inLat" placeholder="如 39.9042（北纬为正）">
+                <span class="field-hint">范围 -90 ~ 90，留空不写入坐标</span>
+            </div>
+            <div class="form-item">
+                <label>经度 Longitude</label>
+                <input type="text" id="inLon" placeholder="如 116.4074（东经为正）">
+                <span class="field-hint">范围 -180 ~ 180，需与纬度同时填写</span>
+            </div>
+            <div class="form-item">
+                <label>拍摄时间</label>
+                <input type="datetime-local" id="inTime">
+                <span class="field-hint">留空则保留原 EXIF 时间</span>
+            </div>
+            <div class="form-item">
+                <label>设备型号</label>
+                <input type="text" id="inDevice" placeholder="如 DJI Mavic 3 / Trimble X7">
+                <span class="field-hint">留空保留原设备信息</span>
+            </div>
+            <div class="form-item full">
+                <label>备注说明</label>
+                <textarea id="inNote" placeholder="如水系测量 - 断面线 3 号点、外业小组：一组等"></textarea>
+            </div>
+        </div>
+        <button class="btn-process" id="btnProcess" disabled>&#128229; 批量写入水印</button>
+    </div>
+
+    <!-- 3. 处理结果 -->
+    <div class="card" id="resultCard" style="display:none;">
+        <h3>&#9989; 处理结果</h3>
+        <div class="result-summary" id="resultSummary"></div>
+        <a class="btn-download-main" id="btnZip" href="#" target="_blank">&#128230; 打包下载全部（zip）</a>
+        <div class="result-grid" id="resultGrid" style="margin-top:14px;"></div>
+    </div>
+
+</main>
+
+<div id="toast-container" class="toast-container"></div>
+<script src="/static/js/common.js"></script>
+
+<script>
+(function () {
+    let selectedFiles = [];
+    let processedResults = [];
+
+    // ===== 上传区 =====
+    const uzone = document.getElementById("uploadZone");
+    const uploader = initUploadZone(uzone, {
+        accept: ".jpg,.jpeg,.tiff,.tif,.png,.bmp,.webp",
+        multiple: true,
+        maxFileSizeMB: 30,
+        onFilesSelected(files) {
+            selectedFiles = selectedFiles.concat(files);
+            renderFileList();
+            document.getElementById("btnProcess").disabled = selectedFiles.length === 0;
+        },
+    });
+    uzone.addEventListener("dblclick", () => {
+        selectedFiles = [];
+        renderFileList();
+        document.getElementById("btnProcess").disabled = true;
+    });
+
+    function renderFileList() {
+        const el = document.getElementById("fileList");
+        if (!selectedFiles.length) {
+            el.innerHTML = "";
+            uzone.classList.remove("has-file");
+            return;
+        }
+        uzone.classList.add("has-file");
+        el.innerHTML = selectedFiles.map(f =>
+            '<div class="file-item">' + escapeHtml(f.name) +
+            ' <span class="file-size">' + formatFileSize(f.size) + '</span></div>'
+        ).join("");
+        if (selectedFiles.length > 6) {
+            el.innerHTML += '<div style="color:#94A3B8;font-size:12px;margin-top:4px;">...共 ' + selectedFiles.length + ' 张</div>';
+        }
+    }
+
+    // ===== 处理 =====
+    document.getElementById("btnProcess").addEventListener("click", async () => {
+        if (!selectedFiles.length) { Toast.warning("请先选择照片"); return; }
+
+        const lat = document.getElementById("inLat").value.trim();
+        const lon = document.getElementById("inLon").value.trim();
+        if ((lat && !lon) || (!lat && lon)) {
+            Toast.warning("经纬度需同时填写或同时留空");
+            return;
+        }
+
+        const formData = new FormData();
+        selectedFiles.forEach(f => formData.append("files", f));
+        if (lat) formData.append("lat", lat);
+        if (lon) formData.append("lon", lon);
+        formData.append("datetime_str", document.getElementById("inTime").value);
+        formData.append("device", document.getElementById("inDevice").value.trim());
+        formData.append("note", document.getElementById("inNote").value.trim());
+
+        toggleLoading(true, "写入 EXIF 水印中...");
+        try {
+            const res = await API.upload("/api/survey/watermark", formData);
+            if (res.ok && res.data?.ok) {
+                const d = res.data.data;
+                renderResult(d);
+                Toast.success(res.data.message);
+            } else {
+                Toast.error(res.data?.error || "处理失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // ===== 渲染结果 =====
+    function renderResult(d) {
+        document.getElementById("resultCard").style.display = "block";
+        document.getElementById("resultSummary").innerHTML =
+            "共 <strong>" + d.total + "</strong> 张，成功 <strong>" + d.processed + "</strong> 张" +
+            (d.failed ? "，失败 <strong>" + d.failed + "</strong> 张" : "") +
+            (d.zip_size_kb ? "，压缩包 <strong>" + d.zip_size_kb + " KB</strong>" : "");
+
+        const zipBtn = document.getElementById("btnZip");
+        zipBtn.href = d.zip_url;
+        zipBtn.download = d.zip_name;
+
+        document.getElementById("resultGrid").innerHTML = d.results.map(r => {
+            if (r.status === "ok") {
+                let info = "";
+                if (r.lat !== undefined && r.lon !== undefined) info += "GPS: " + r.lat + ", " + r.lon + "<br>";
+                if (r.time) info += "时间: " + r.time + "<br>";
+                if (r.device) info += "设备: " + r.device + "<br>";
+                if (r.note) info += "备注: " + r.note;
+                return '<div class="result-item ok">' +
+                    '<img src="' + r.url + '" alt="' + escapeHtml(r.name) + '">' +
+                    '<div class="ri-body">' +
+                    '<div class="ri-name" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</div>' +
+                    '<div class="ri-status">&#9989; 已写入</div>' +
+                    (info ? '<div class="ri-info">' + info + '</div>' : '') +
+                    '<a class="ri-dl" href="' + r.url + '" download>单张下载 &#8595;</a>' +
+                    '</div></div>';
+            }
+            return '<div class="result-item err">' +
+                '<div class="ri-body" style="padding-top:14px;">' +
+                '<div class="ri-name" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</div>' +
+                '<div class="ri-status">&#10060; ' + escapeHtml(r.message || "处理失败") + '</div>' +
+                '</div></div>';
+        }).join("");
+        document.getElementById("resultCard").scrollIntoView({ behavior: "smooth" });
+    }
+})();
+</script>
+
 </body>
 </html>

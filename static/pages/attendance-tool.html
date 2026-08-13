@@ -5,19 +5,663 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>考勤点名工具 - FieldKit</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        :root {
+            /* 与首页色调一致（淡粉色系） */
+            --primary: #D89DB5;
+            --primary-hover: #C48A9F;
+            --primary-light: #FBF0F4;
+            --primary-border: #F0DCE6;
+            --gray-bg: #F8F9FA;
+            --gray-text: #64748B;
+            --radius: 10px;
+        }
+        body { background: var(--gray-bg); min-height: 100vh; }
+
+        .tool-header {
+            background: #fff; border-bottom: 1px solid #E2E8F0;
+            padding: 0 32px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .tool-header .back-link { color: var(--primary); text-decoration: none; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+        .tool-header .back-link:hover { color: var(--primary-hover); }
+        .tool-header .tool-title { font-size: 18px; font-weight: 600; color: #1E293B; }
+        .tool-header .header-spacer { width: 80px; }
+
+        .tool-main { max-width: 960px; margin: 28px auto; padding: 0 20px; }
+
+        /* ===== 步骤条 ===== */
+        .steps {
+            display: flex; background: #fff; border: 1px solid #E2E8F0;
+            border-radius: var(--radius); padding: 14px 20px; margin-bottom: 18px;
+            gap: 0;
+        }
+        .step-item {
+            flex: 1; display: flex; align-items: center; gap: 10px;
+            color: #94A3B8; font-size: 14px;
+        }
+        .step-item .step-num {
+            width: 26px; height: 26px; border-radius: 50%; flex: none;
+            background: #E2E8F0; color: #94A3B8;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 600; font-size: 13px;
+        }
+        .step-item.active { color: #1E293B; font-weight: 600; }
+        .step-item.active .step-num { background: var(--primary); color: #fff; }
+        .step-item.done { color: var(--primary); }
+        .step-item.done .step-num { background: var(--primary-light); color: var(--primary); }
+        .step-arrow { color: #CBD5E1; font-size: 16px; flex: none; }
+
+        .card {
+            background: #fff; border: 1px solid #E2E8F0;
+            border-radius: var(--radius); padding: 24px; margin-bottom: 18px;
+        }
+        .card h3 { font-size: 15px; font-weight: 600; color: #1E293B; margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid var(--primary-border); }
+
+        /* ===== 上传区 ===== */
+        .upload-zone {
+            border: 2px dashed #CBD5E1; border-radius: var(--radius);
+            padding: 30px 20px; text-align: center; cursor: pointer;
+            transition: all 0.25s; background: #FAFBFC;
+        }
+        .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); background: var(--primary-light); }
+        .upload-zone.has-file { border-style: solid; border-color: var(--primary); background: #F8FAFE; }
+        .upload-icon { font-size: 36px; margin-bottom: 6px; }
+        .upload-text { font-size: 14px; color: var(--gray-text); }
+        .upload-hint { font-size: 12px; color: #94A3B8; margin-top: 6px; }
+        .upload-file-list { font-size: 13px; color: var(--primary); margin-top: 10px; text-align: left; max-height: 120px; overflow-y: auto; line-height: 1.8; }
+        .upload-file-list .file-item { padding: 2px 6px; border-radius: 4px; }
+        .upload-file-list .file-item:nth-child(odd) { background: #F1F5F9; }
+        .upload-file-list .file-size { color: #94A3B8; margin-left: 8px; font-size: 12px; }
+        .upload-zone:not(.has-file) .upload-file-list { display: none; }
+
+        /* ===== 按钮 ===== */
+        .btn-process {
+            width: 100%; padding: 12px; background: var(--primary); color: #fff;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: all 0.2s; margin-top: 16px;
+        }
+        .btn-process:hover { background: var(--primary-hover); }
+        .btn-process:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-ghost {
+            padding: 8px 16px; background: #fff; color: var(--primary);
+            border: 1px solid var(--primary-border); border-radius: 6px;
+            font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-ghost:hover { background: var(--primary-light); }
+        .btn-ghost:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-danger-ghost { color: #EF4444; border-color: #FECACA; background: #fff; }
+        .btn-danger-ghost:hover { background: #FEF2F2; }
+
+        /* ===== 解析结果 ===== */
+        .roster-info { font-size: 13px; color: var(--gray-text); line-height: 2; margin-bottom: 10px; }
+        .roster-info strong { color: var(--primary); }
+        .roster-preview {
+            background: #FAFBFC; border: 1px solid #F1F5F9; border-radius: 8px;
+            padding: 10px 14px; font-size: 12px; color: #475569; max-height: 140px; overflow-y: auto; line-height: 1.9;
+        }
+        .col-map { display: inline-block; background: var(--primary-light); color: var(--primary); border-radius: 4px; padding: 1px 8px; font-size: 12px; margin-right: 6px; }
+
+        /* ===== 点名区 ===== */
+        .stats-bar {
+            display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;
+        }
+        .stat-chip {
+            flex: 1; min-width: 90px; background: #FAFBFC; border: 1px solid #F1F5F9;
+            border-radius: 8px; padding: 8px 10px; text-align: center;
+        }
+        .stat-chip .stat-num { font-size: 20px; font-weight: 700; color: #1E293B; }
+        .stat-chip .stat-label { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+        .stat-chip.present .stat-num { color: #16A34A; }
+        .stat-chip.late .stat-num { color: #D97706; }
+        .stat-chip.leave .stat-num { color: #2563EB; }
+        .stat-chip.absent .stat-num { color: #DC2626; }
+
+        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
+        .toolbar .spacer { flex: 1; }
+        .toolbar-hint { font-size: 12px; color: #94A3B8; }
+
+        /* 随机点名提示 */
+        .random-callout {
+            display: none; margin-bottom: 14px; padding: 12px 16px;
+            background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px;
+            font-size: 14px; color: #92400E;
+        }
+        .random-callout.show { display: flex; align-items: center; gap: 12px; }
+        .random-callout .rc-name { font-size: 18px; font-weight: 700; color: #B45309; }
+        .random-callout .rc-close { margin-left: auto; cursor: pointer; color: #D97706; font-weight: 700; }
+
+        /* 名单网格 */
+        .roster-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px; max-height: 420px; overflow-y: auto; padding: 4px;
+        }
+        .person-card {
+            border: 2px solid #E2E8F0; border-radius: 8px; padding: 10px;
+            text-align: center; cursor: pointer; transition: all 0.15s;
+            background: #fff; user-select: none;
+        }
+        .person-card:hover { border-color: #94A3B8; transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+        .person-card .pc-name { font-size: 15px; font-weight: 600; color: #1E293B; }
+        .person-card .pc-sub { font-size: 11px; color: #94A3B8; margin-top: 3px; min-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .person-card .pc-status { font-size: 11px; font-weight: 600; margin-top: 6px; color: #94A3B8; }
+
+        /* 状态配色 */
+        .person-card.st-present { border-color: #16A34A; background: #F0FDF4; }
+        .person-card.st-present .pc-status { color: #16A34A; }
+        .person-card.st-late { border-color: #D97706; background: #FFFBEB; }
+        .person-card.st-late .pc-status { color: #D97706; }
+        .person-card.st-leave { border-color: #2563EB; background: #EFF6FF; }
+        .person-card.st-leave .pc-status { color: #2563EB; }
+        .person-card.st-absent { border-color: #DC2626; background: #FEF2F2; }
+        .person-card.st-absent .pc-status { color: #DC2626; }
+        .person-card.rolling { animation: rollFlash 0.6s ease-in-out 3; }
+        @keyframes rollFlash { 0%,100% { box-shadow: 0 0 0 0 rgba(217,119,6,0); } 50% { box-shadow: 0 0 0 4px rgba(217,119,6,0.45); } }
+
+        /* 合照区 */
+        .photos-zone { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+        .photo-item { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #E2E8F0; background: #FAFBFC; cursor: zoom-in; }
+        .photo-item img { width: 100%; height: 130px; object-fit: cover; display: block; }
+        .photo-item .photo-name { font-size: 11px; color: var(--gray-text); padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .photo-item .photo-del {
+            position: absolute; top: 4px; right: 4px; width: 22px; height: 22px;
+            background: rgba(0,0,0,0.55); color: #fff; border: none; border-radius: 50%;
+            cursor: pointer; font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center;
+        }
+        .photo-item .photo-del:hover { background: #DC2626; }
+
+        /* 灯箱 */
+        .lightbox {
+            display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.9);
+            z-index: 999; align-items: center; justify-content: center; flex-direction: column; padding: 20px;
+        }
+        .lightbox.show { display: flex; }
+        .lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 6px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+        .lightbox .lb-close { margin-top: 14px; color: #CBD5E1; cursor: pointer; font-size: 14px; background: rgba(255,255,255,0.1); border: none; border-radius: 6px; padding: 8px 20px; }
+
+        /* ===== 导出结果 ===== */
+        .export-summary { font-size: 14px; color: var(--gray-text); line-height: 2.2; }
+        .export-summary strong { color: var(--primary); }
+        .btn-download-main {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 16px; padding: 10px 24px;
+            background: var(--primary); color: #fff; border: none; border-radius: 8px;
+            font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; transition: background 0.2s;
+        }
+        .btn-download-main:hover { background: var(--primary-hover); }
+
+        .section-step { display: none; }
+        .section-step.active { display: block; }
+
+        @media (max-width: 640px) {
+            .tool-main { padding: 0 12px; }
+            .card { padding: 16px; }
+            .step-item { font-size: 12px; gap: 6px; }
+            .stats-bar { gap: 6px; }
+            .stat-chip { min-width: 60px; }
+            .toolbar .spacer { display: none; }
+        }
+    </style>
 </head>
 <body>
-    <main class="main-container">
-        <div class="page-header">
-            <a href="/static/index.html" class="page-back">&larr; 返回首页</a>
-            <h1 class="page-title">考勤点名工具</h1>
+
+<!-- ====== 顶部导航 ====== -->
+<header class="tool-header">
+    <a href="/static/index.html" class="back-link">&#8592; 返回首页</a>
+    <span class="tool-title">&#128203; 考勤点名工具</span>
+    <span class="header-spacer"></span>
+</header>
+
+<!-- ====== 主内容 ====== -->
+<main class="tool-main">
+
+    <!-- 步骤条 -->
+    <div class="steps">
+        <div class="step-item active" id="stepItem1">
+            <span class="step-num">1</span><span>导入花名册</span>
         </div>
-        <div class="card" style="text-align:center; padding: 80px 0; color: var(--color-text-muted);">
-            <p style="font-size:48px; margin-bottom:16px;">&#128203;</p>
-            <p>模块开发中，敬请期待...</p>
+        <div class="step-arrow">&#10095;</div>
+        <div class="step-item" id="stepItem2">
+            <span class="step-num">2</span><span>点名</span>
         </div>
-    </main>
-    <div id="toast-container" class="toast-container"></div>
-    <script src="/static/js/common.js"></script>
+        <div class="step-arrow">&#10095;</div>
+        <div class="step-item" id="stepItem3">
+            <span class="step-num">3</span><span>导出考勤表</span>
+        </div>
+    </div>
+
+    <!-- ====== 步骤 1：导入花名册 ====== -->
+    <div class="section-step active" id="step1">
+        <div class="card">
+            <h3>&#128220; 上传花名册</h3>
+            <div class="upload-zone" id="uploadZoneRoster">
+                <div class="upload-placeholder">
+                    <div class="upload-icon">&#128196;</div>
+                    <div class="upload-text">点击或拖拽上传花名册文件（.xlsx / .csv）</div>
+                    <div class="upload-hint">第一行建议为表头：姓名、学号/工号、班级/部门（列顺序不限）</div>
+                </div>
+                <div class="upload-file-list" id="rosterFileList"></div>
+            </div>
+            <div class="roster-info" id="rosterInfo" style="display:none;"></div>
+            <div class="roster-preview" id="rosterPreview" style="display:none;"></div>
+            <button class="btn-process" id="btnParse" disabled>&#128269; 解析花名册</button>
+        </div>
+    </div>
+
+    <!-- ====== 步骤 2：点名 ====== -->
+    <div class="section-step" id="step2">
+        <div class="card">
+            <h3>&#128203; 点名操作区 <small style="color:#94A3B8;font-weight:400;font-size:12px;">（点击人员卡片循环切换状态）</small></h3>
+
+            <div class="stats-bar">
+                <div class="stat-chip"><div class="stat-num" id="stTotal">0</div><div class="stat-label">应到</div></div>
+                <div class="stat-chip present"><div class="stat-num" id="stPresent">0</div><div class="stat-label">到场</div></div>
+                <div class="stat-chip late"><div class="stat-num" id="stLate">0</div><div class="stat-label">迟到</div></div>
+                <div class="stat-chip leave"><div class="stat-num" id="stLeave">0</div><div class="stat-label">请假</div></div>
+                <div class="stat-chip absent"><div class="stat-num" id="stAbsent">0</div><div class="stat-label">缺席</div></div>
+                <div class="stat-chip"><div class="stat-num" id="stRate">0%</div><div class="stat-label">出勤率</div></div>
+            </div>
+
+            <div class="toolbar">
+                <button class="btn-ghost" id="btnAllPresent">&#9989; 全部到场</button>
+                <button class="btn-ghost" id="btnRollCall">&#127922; 随机点名</button>
+                <button class="btn-ghost btn-danger-ghost" id="btnResetAll">&#8634; 全部重置</button>
+                <span class="spacer"></span>
+                <span class="toolbar-hint" id="rollHint" style="display:none;"></span>
+            </div>
+
+            <div class="random-callout" id="randomCallout">
+                <span>&#127922; 点到：</span>
+                <span class="rc-name" id="rcName"></span>
+                <span id="rcSub"></span>
+                <span class="rc-close" id="rcClose">&#10005; 关闭</span>
+            </div>
+
+            <div class="roster-grid" id="rosterGrid"></div>
+        </div>
+
+        <div class="card">
+            <h3>&#128247; 活动合照（可选，辅助人工核对）</h3>
+            <div class="upload-zone" id="uploadZonePhotos">
+                <div class="upload-placeholder">
+                    <div class="upload-icon">&#128444;</div>
+                    <div class="upload-text">点击或拖拽上传活动合照（可多张，点击图片可放大）</div>
+                    <div class="upload-hint">支持 jpg / png / webp / gif，单张最大 10MB</div>
+                </div>
+                <div class="upload-file-list" id="photoFileList"></div>
+            </div>
+            <div class="photos-zone" id="photosZone"></div>
+            <button class="btn-process" id="btnExport" disabled>&#11015; 导出考勤表（进行到下一步）</button>
+        </div>
+    </div>
+
+    <!-- ====== 步骤 3：导出结果 ====== -->
+    <div class="section-step" id="step3">
+        <div class="card">
+            <h3>&#9989; 考勤表已生成</h3>
+            <div class="export-summary" id="exportSummary"></div>
+            <a class="btn-download-main" id="btnDownload" href="#" target="_blank">&#128229; 下载 Excel 考勤表</a>
+            <div style="margin-top:14px;">
+                <button class="btn-ghost" id="btnBackEdit">&#8634; 返回继续修改点名</button>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- Toast + 灯箱 -->
+<div id="toast-container" class="toast-container"></div>
+<div class="lightbox" id="lightbox">
+    <img id="lbImg" src="" alt="合照">
+    <button class="lb-close" id="lbClose">关闭</button>
+</div>
+<script src="/static/js/common.js"></script>
+
+<script>
+/* ================================================================
+ * 考勤点名工具 - 前端交互逻辑
+ * ================================================================ */
+(function () {
+    // ===== 状态 =====
+    let sessionId = null;
+    let people = [];          // [{name, no, dept, status, remark}]
+    let rosterFile = null;
+    let photoFiles = [];
+    let exportedUrl = "";
+
+    const STATUS_ORDER = ["", "present", "late", "leave", "absent"];
+    const STATUS_META = {
+        "":        { text: "未点名", icon: "&#9675;" },
+        "present": { text: "到场",   icon: "&#9989;" },
+        "late":    { text: "迟到",   icon: "&#9203;" },
+        "leave":   { text: "请假",   icon: "&#128172;" },
+        "absent":  { text: "缺席",   icon: "&#10060;" },
+    };
+
+    // ===== 步骤切换 =====
+    function goStep(n) {
+        document.querySelectorAll(".section-step").forEach(s => s.classList.remove("active"));
+        document.getElementById("step" + n).classList.add("active");
+        for (let i = 1; i <= 3; i++) {
+            const el = document.getElementById("stepItem" + i);
+            el.classList.remove("active", "done");
+            if (i < n) el.classList.add("done");
+            if (i === n) el.classList.add("active");
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // ===== 上传区：花名册 =====
+    const uzoneRoster = document.getElementById("uploadZoneRoster");
+    const rosterUploader = initUploadZone(uzoneRoster, {
+        accept: ".xlsx,.csv",
+        multiple: false,
+        maxFileSizeMB: 10,
+        onFilesSelected(files) {
+            rosterFile = files[0] || null;
+            renderFileList(rosterFile ? [rosterFile] : [], "rosterFileList", uzoneRoster);
+            document.getElementById("btnParse").disabled = !rosterFile;
+        },
+    });
+    uzoneRoster.addEventListener("dblclick", () => {
+        rosterFile = null;
+        renderFileList([], "rosterFileList", uzoneRoster);
+        document.getElementById("btnParse").disabled = true;
+    });
+
+    // ===== 上传区：合照 =====
+    const uzonePhotos = document.getElementById("uploadZonePhotos");
+    const photoUploader = initUploadZone(uzonePhotos, {
+        accept: ".jpg,.jpeg,.png,.webp,.gif,.bmp",
+        multiple: true,
+        maxFileSizeMB: 10,
+        onFilesSelected(files) {
+            photoFiles = photoFiles.concat(files);
+            renderFileList(photoFiles, "photoFileList", uzonePhotos);
+            uploadPhotos();
+        },
+    });
+
+    // ===== 文件列表渲染 =====
+    function renderFileList(files, listId, zone) {
+        const el = document.getElementById(listId);
+        if (!files.length) {
+            el.innerHTML = "";
+            zone.classList.remove("has-file");
+            return;
+        }
+        zone.classList.add("has-file");
+        el.innerHTML = files.map(f =>
+            '<div class="file-item">' + escapeHtml(f.name) +
+            ' <span class="file-size">' + formatFileSize(f.size) + '</span></div>'
+        ).join("");
+        if (files.length > 5) {
+            el.innerHTML += '<div style="color:#94A3B8;font-size:12px;margin-top:4px;">...共 ' + files.length + ' 个文件</div>';
+        }
+    }
+
+    // ===== 解析花名册 =====
+    document.getElementById("btnParse").addEventListener("click", async () => {
+        if (!rosterFile) { Toast.warning("请先选择花名册文件"); return; }
+        const formData = new FormData();
+        formData.append("file", rosterFile);
+        toggleLoading(true, "解析花名册中...");
+        try {
+            const res = await API.upload("/api/attendance/roster", formData);
+            if (res.ok && res.data?.ok) {
+                const d = res.data.data;
+                sessionId = d.session_id;
+                people = d.people.map(p => ({ ...p, status: "", remark: "" }));
+                renderRosterInfo(d);
+                renderGrid();
+                updateStats();
+                updateExportBtn();
+                goStep(2);
+                Toast.success(res.data.message);
+            } else {
+                Toast.error(res.data?.error || "解析失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // ===== 渲染解析信息 =====
+    function renderRosterInfo(d) {
+        const cols = d.columns || {};
+        let colHtml = "";
+        if (cols.name) colHtml += '<span class="col-map">姓名: ' + escapeHtml(cols.name) + '</span>';
+        if (cols.no)   colHtml += '<span class="col-map">学号/工号: ' + escapeHtml(cols.no) + '</span>';
+        if (cols.dept) colHtml += '<span class="col-map">班级/部门: ' + escapeHtml(cols.dept) + '</span>';
+
+        const infoEl = document.getElementById("rosterInfo");
+        infoEl.style.display = "block";
+        infoEl.innerHTML = "识别到 <strong>" + d.total + "</strong> 人" +
+            (colHtml ? "，字段映射：" + colHtml : "") +
+            "，来源文件：" + escapeHtml(rosterFile.name);
+
+        const prevEl = document.getElementById("rosterPreview");
+        const first = d.people.slice(0, 8).map(p => p.name).join("、");
+        prevEl.style.display = "block";
+        prevEl.innerHTML = "名单预览：" + escapeHtml(first) + (d.total > 8 ? " …" : "");
+    }
+
+    // ===== 渲染点名网格 =====
+    function renderGrid() {
+        const grid = document.getElementById("rosterGrid");
+        grid.innerHTML = people.map((p, idx) => {
+            const meta = STATUS_META[p.status] || STATUS_META[""];
+            const sub = [p.no, p.dept].filter(Boolean).join(" · ");
+            return '<div class="person-card st-' + (p.status || "none") + '" data-idx="' + idx + '" title="点击切换状态">' +
+                '<div class="pc-name">' + escapeHtml(p.name) + '</div>' +
+                '<div class="pc-sub">' + escapeHtml(sub) + '</div>' +
+                '<div class="pc-status">' + meta.icon + ' ' + meta.text + '</div>' +
+                '</div>';
+        }).join("");
+    }
+
+    // ===== 点名点击 =====
+    document.getElementById("rosterGrid").addEventListener("click", (ev) => {
+        const card = ev.target.closest(".person-card");
+        if (!card) return;
+        const idx = parseInt(card.dataset.idx, 10);
+        const p = people[idx];
+        if (!p) return;
+        const next = STATUS_ORDER[(STATUS_ORDER.indexOf(p.status) + 1) % STATUS_ORDER.length];
+        p.status = next;
+        const meta = STATUS_META[next];
+        card.className = "person-card st-" + (next || "none");
+        card.querySelector(".pc-status").innerHTML = meta.icon + " " + meta.text;
+        updateStats();
+        updateExportBtn();
+    });
+
+    // ===== 统计 =====
+    function updateStats() {
+        const total = people.length;
+        let present = 0, late = 0, leave = 0, absent = 0;
+        people.forEach(p => {
+            if (p.status === "present") present++;
+            else if (p.status === "late") late++;
+            else if (p.status === "leave") leave++;
+            else if (p.status === "absent") absent++;
+        });
+        document.getElementById("stTotal").textContent = total;
+        document.getElementById("stPresent").textContent = present;
+        document.getElementById("stLate").textContent = late;
+        document.getElementById("stLeave").textContent = leave;
+        document.getElementById("stAbsent").textContent = absent;
+        const rate = total ? Math.round((present + late) / total * 100) : 0;
+        document.getElementById("stRate").textContent = rate + "%";
+    }
+
+    function updateExportBtn() {
+        const marked = people.some(p => p.status !== "");
+        document.getElementById("btnExport").disabled = !marked || people.length === 0;
+    }
+
+    // ===== 全部到场 =====
+    document.getElementById("btnAllPresent").addEventListener("click", () => {
+        if (!people.length) return;
+        people.forEach(p => p.status = "present");
+        renderGrid(); updateStats(); updateExportBtn();
+        Toast.success("已全部标记为到场");
+    });
+
+    // ===== 全部重置 =====
+    document.getElementById("btnResetAll").addEventListener("click", () => {
+        if (!people.length) return;
+        people.forEach(p => { p.status = ""; p.remark = ""; });
+        renderGrid(); updateStats(); updateExportBtn();
+        hideRollCall();
+        Toast.info("已重置所有点名状态");
+    });
+
+    // ===== 随机点名 =====
+    document.getElementById("btnRollCall").addEventListener("click", () => {
+        const pool = people.map((p, i) => ({ p, i })).filter(x => x.p.status === "");
+        if (!pool.length) {
+            Toast.warning("没有未点名的人员了，可先「全部重置」");
+            return;
+        }
+        // 快速闪烁动画
+        let tick = 0;
+        const totalTicks = 20;
+        const interval = setInterval(() => {
+            const rand = pool[Math.floor(Math.random() * pool.length)];
+            const card = document.querySelector('.person-card[data-idx="' + rand.i + '"]');
+            if (card) {
+                card.classList.remove("rolling");
+                void card.offsetWidth; // 重启动画
+                card.classList.add("rolling");
+            }
+            tick++;
+            if (tick >= totalTicks) {
+                clearInterval(interval);
+                const picked = pool[Math.floor(Math.random() * pool.length)];
+                showRollCall(picked.p, picked.i);
+            }
+        }, 90);
+    });
+
+    function showRollCall(person, idx) {
+        const co = document.getElementById("randomCallout");
+        document.getElementById("rcName").textContent = person.name;
+        document.getElementById("rcSub").textContent =
+            [person.no, person.dept].filter(Boolean).join(" · ");
+        co.classList.add("show");
+        document.getElementById("rollHint").style.display = "inline";
+        document.getElementById("rollHint").textContent = "上次点到：" + person.name + "（点击该卡片可标记状态）";
+        // 滚动到卡片位置
+        const card = document.querySelector('.person-card[data-idx="' + idx + '"]');
+        if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function hideRollCall() {
+        document.getElementById("randomCallout").classList.remove("show");
+        document.getElementById("rollHint").style.display = "none";
+    }
+    document.getElementById("rcClose").addEventListener("click", hideRollCall);
+
+    // ===== 合照上传 =====
+    async function uploadPhotos() {
+        if (!photoFiles.length) return;
+        const formData = new FormData();
+        photoFiles.forEach(f => formData.append("files", f));
+        toggleLoading(true, "上传合照中...");
+        try {
+            const res = await API.upload("/api/attendance/photos", formData);
+            if (res.ok && res.data?.ok) {
+                renderPhotos(res.data.data.photos);
+                Toast.success(res.data.message);
+            } else {
+                Toast.error(res.data?.error || "合照上传失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    }
+
+    let uploadedPhotos = []; // [{name, url}]
+    function renderPhotos(photos) {
+        uploadedPhotos = photos;
+        const zone = document.getElementById("photosZone");
+        zone.innerHTML = photos.map((ph, i) =>
+            '<div class="photo-item" data-url="' + ph.url + '">' +
+                '<img src="' + ph.url + '" alt="' + escapeHtml(ph.name) + '">' +
+                '<div class="photo-name">' + escapeHtml(ph.name) + '</div>' +
+                '<button class="photo-del" data-idx="' + i + '" title="删除">&times;</button>' +
+            '</div>'
+        ).join("");
+    }
+
+    // 点击放大（灯箱）
+    document.getElementById("photosZone").addEventListener("click", (ev) => {
+        const del = ev.target.closest(".photo-del");
+        if (del) {
+            const idx = parseInt(del.dataset.idx, 10);
+            uploadedPhotos.splice(idx, 1);
+            renderPhotos(uploadedPhotos);
+            return;
+        }
+        const item = ev.target.closest(".photo-item");
+        if (!item) return;
+        document.getElementById("lbImg").src = item.dataset.url;
+        document.getElementById("lightbox").classList.add("show");
+    });
+    document.getElementById("lbClose").addEventListener("click", () => {
+        document.getElementById("lightbox").classList.remove("show");
+    });
+    document.getElementById("lightbox").addEventListener("click", (ev) => {
+        if (ev.target === document.getElementById("lightbox")) {
+            document.getElementById("lightbox").classList.remove("show");
+        }
+    });
+
+    // ===== 导出考勤表 =====
+    document.getElementById("btnExport").addEventListener("click", async () => {
+        const records = people.map(p => ({ ...p }));
+        const title = "点名记录";
+        const formData = new FormData();
+        formData.append("session_id", sessionId);
+        formData.append("title", title);
+        formData.append("records", JSON.stringify(records));
+
+        toggleLoading(true, "生成考勤表中...");
+        try {
+            const res = await API.upload("/api/attendance/export", formData);
+            if (res.ok && res.data?.ok) {
+                const d = res.data.data;
+                exportedUrl = d.download_url;
+                document.getElementById("exportSummary").innerHTML =
+                    "考勤名称：<strong>" + escapeHtml(title) + "</strong><br>" +
+                    "应到 <strong>" + d.total + "</strong> 人，实到 <strong>" + d.present + "</strong> 人，" +
+                    "缺席 <strong>" + d.absent + "</strong> 人" +
+                    (d.size_kb ? "，文件大小 <strong>" + d.size_kb + " KB</strong>" : "");
+                const btn = document.getElementById("btnDownload");
+                btn.href = d.download_url;
+                btn.download = d.filename;
+                goStep(3);
+                Toast.success(res.data.message);
+            } else {
+                Toast.error(res.data?.error || "导出失败");
+            }
+        } catch (e) {
+            Toast.error("网络异常: " + e.message);
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // ===== 返回修改 =====
+    document.getElementById("btnBackEdit").addEventListener("click", () => goStep(2));
+
+})();
+</script>
+
 </body>
 </html>
