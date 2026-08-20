@@ -559,7 +559,7 @@ def build_summary_workbook(records: List[Dict], source_name: str) -> Workbook:
 # ============================================================
 
 @router.get("/template", summary="下载资产清查表标准模板（xlsx）")
-async def download_template():
+def download_template():
     """
     生成并返回标准模板 Excel：
     - Sheet1 资产清查表：标题/说明/表头/示例行 + 类别下拉
@@ -588,7 +588,7 @@ async def download_template():
 # ============================================================
 
 @router.post("/parse", summary="上传资产清查表并校验（xlsx/xls）")
-async def parse_asset(
+def parse_asset(
     file: UploadFile = File(..., description="资产清查表文件（.xlsx / .xls）"),
 ):
     """
@@ -612,7 +612,7 @@ async def parse_asset(
     if not ok:
         return _error(400, msg)
 
-    content = await file.read()
+    content = file.file.read()
     records, all_errors = _parse_asset_file(content, file.filename)
 
     # 保存解析结果
@@ -675,7 +675,7 @@ async def parse_asset(
 # ============================================================
 
 @router.post("/export", summary="根据填报数据生成汇总统计表（xlsx）")
-async def export_summary(
+def export_summary(
     session_id: str = Form(..., description="填报会话 ID"),
     title: str = Form(default="", description="村名/表名（可选）"),
 ):

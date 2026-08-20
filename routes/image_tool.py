@@ -23,6 +23,9 @@ from utils.file_check import validate_single_file
 
 logger = logging.getLogger("FieldKit.ImageTool")
 
+# 像素炸弹防护：单张图片像素数超过上限直接报错，避免超大图拖垮内存
+Image.MAX_IMAGE_PIXELS = 50_000_000  # 约 5000 万像素
+
 # ============================================================
 # 路由实例
 # ============================================================
@@ -161,7 +164,7 @@ async def get_processed_image(filename: str):
 # ============================================================
 
 @router.post("/compress", summary="图片压缩")
-async def compress_image(
+def compress_image(
     file: UploadFile = File(..., description="待压缩的图片文件"),
     quality: int = Form(80, ge=1, le=100, description="压缩质量 1-100，默认 80"),
 ):
@@ -193,7 +196,7 @@ async def compress_image(
             return _error_response(400, "未选择文件")
 
         # ---- 格式校验 ----
-        contents = await file.read()
+        contents = file.file.read()
         original_size = len(contents)
         ok, err_msg = validate_single_file(
             filename=file.filename,
@@ -206,6 +209,8 @@ async def compress_image(
         # ---- 打开图片 ----
         try:
             img = Image.open(BytesIO(contents))
+        except Image.DecompressionBombError:
+            return _error_response(400, "图片像素过大（超出安全上限），请压缩后重新上传")
         except UnidentifiedImageError:
             return _error_response(400, "无法识别该图片格式，文件可能已损坏")
         except Exception:
@@ -254,7 +259,7 @@ async def compress_image(
         raise
     except Exception as e:
         logger.exception(f"图片压缩异常: {file.filename}")
-        return _error_response(500, f"服务器内部错误: {str(e)}")
+        return _error_response(500, "服务器内部错误，请稍后重试或联系管理员")
 
 
 # ============================================================
@@ -262,7 +267,7 @@ async def compress_image(
 # ============================================================
 
 @router.post("/resize", summary="图片尺寸缩放")
-async def resize_image(
+def resize_image(
     file: UploadFile = File(..., description="待缩放的图片文件"),
     width: Optional[int] = Form(None, ge=1, le=8000, description="目标宽度(px)"),
     height: Optional[int] = Form(None, ge=1, le=8000, description="目标高度(px)"),
@@ -307,7 +312,7 @@ async def resize_image(
             return _error_response(400, "mode 参数无效，可选: inside / cover / exact")
 
         # ---- 格式校验 ----
-        contents = await file.read()
+        contents = file.file.read()
         ok, err_msg = validate_single_file(
             filename=file.filename,
             file_size=len(contents),
@@ -319,6 +324,8 @@ async def resize_image(
         # ---- 打开图片 ----
         try:
             img = Image.open(BytesIO(contents))
+        except Image.DecompressionBombError:
+            return _error_response(400, "图片像素过大（超出安全上限），请压缩后重新上传")
         except UnidentifiedImageError:
             return _error_response(400, "无法识别该图片格式，文件可能已损坏")
         except Exception:
@@ -397,7 +404,7 @@ async def resize_image(
         raise
     except Exception as e:
         logger.exception(f"图片缩放异常: {file.filename}")
-        return _error_response(500, f"服务器内部错误: {str(e)}")
+        return _error_response(500, "服务器内部错误，请稍后重试或联系管理员")
 
 
 # ============================================================
@@ -405,7 +412,7 @@ async def resize_image(
 # ============================================================
 
 @router.post("/watermark", summary="添加文字水印")
-async def add_text_watermark(
+def add_text_watermark(
     file: UploadFile = File(..., description="待添加水印的图片文件"),
     text: str = Form(..., min_length=1, max_length=200, description="水印文字内容"),
     position: str = Form("bottom-right", description="水印位置（单个水印模式，可选）"),
@@ -469,7 +476,7 @@ async def add_text_watermark(
             return _error_response(400, "颜色格式错误，请使用 R,G,B 格式，如 255,255,255")
 
         # ---- 格式校验 ----
-        contents = await file.read()
+        contents = file.file.read()
         ok, err_msg = validate_single_file(
             filename=file.filename,
             file_size=len(contents),
@@ -481,6 +488,8 @@ async def add_text_watermark(
         # ---- 打开图片 ----
         try:
             img = Image.open(BytesIO(contents))
+        except Image.DecompressionBombError:
+            return _error_response(400, "图片像素过大（超出安全上限），请压缩后重新上传")
         except UnidentifiedImageError:
             return _error_response(400, "无法识别该图片格式，文件可能已损坏")
         except Exception:
@@ -602,4 +611,4 @@ async def add_text_watermark(
         raise
     except Exception as e:
         logger.exception(f"水印添加异常: {file.filename}")
-        return _error_response(500, f"服务器内部错误: {str(e)}")
+        return _error_response(500, "服务器内部错误，请稍后重试或联系管理员")

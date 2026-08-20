@@ -1,131 +1,130 @@
 """
-clean_task.py - 临时文件自动清理任务
+clean_task.py - 定时清理临时文件任务
 =====================================
-由 APScheduler 定时触发，清理 temp_file/ 目录中超过指定时长的文件。
-支持按文件修改时间判断、安全边界检查、详细日志记录。
+清理规则：
+1. 仅清理项目根目录下的 temp_file/、temp_image/ 目录（防误删，目录名必须含 "temp"）
+2. 超过 retention_seconds（默认 24 小时）未修改的文件将被删除
+3. 删除失败（文件被占用等）自动跳过，不影响其他文件
+4. 支持 dry_run 模式，仅统计不删除，便于测试
 """
 
 import os
-import time
 import logging
 from pathlib import Path
+from typing import List, Optional
 
-logger = logging.getLogger("FieldKit.CleanTask")
+logger = logging.getLogger(__name__)
 
-# ============================================================
-# 可配置常量
-# ============================================================
+# 项目根目录（utils/ 的上一级）
+ROOT = Path(__file__).resolve().parent.parent
 
-# 项目根目录下的临时文件目录
-TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "temp_file")
+# 参与清理的临时目录
+TEMP_DIRS = [
+    ROOT / "temp_file",
+    ROOT / "temp_image",
+]
 
-# 文件保留时长（秒），默认 24 小时
+# 保留时长（秒），默认 24 小时
 DEFAULT_RETENTION_SECONDS = 24 * 60 * 60
 
 
 def clean_temp_files(
-    temp_dir: str = TEMP_DIR,
+    temp_dirs: Optional[List[Path]] = None,
     retention_seconds: int = DEFAULT_RETENTION_SECONDS,
     dry_run: bool = False,
 ) -> dict:
     """
-    清理临时文件目录中超过保留时长的文件。
+    清理所有临时目录中超过保留时长的文件。
 
-    清理策略：
-    - 以文件的「最后修改时间」(st_mtime) 为判断依据
-    - 只删除普通文件和符号链接，不操作子目录（确保安全）
-    - 遇到无法删除的文件会记录日志并跳过，不影响整体流程
+    Args:
+        temp_dirs: 待清理目录列表，默认使用 TEMP_DIRS
+        retention_seconds: 文件保留时长（秒）
+        dry_run: 为 True 时仅统计不删除（用于测试）
 
-    参数:
-        temp_dir:          临时文件目录路径
-        retention_seconds: 文件保留时长（秒），超过则删除
-        dry_run:           是否为试运行模式（True 时只统计不删除）
-
-    返回:
-        {
-            "cleaned_count": int,   # 清理的文件数量
-            "freed_bytes": int,     # 释放的磁盘空间（字节）
-            "errors": [str, ...],   # 删除失败的文件及原因
-            "dry_run": bool,        # 是否为试运行
-        }
+    Returns:
+        {"removed": 删除数量, "skipped": 跳过数量, "total_size": 释放字节}
     """
-    # ---- 安全检查：确保操作的是 temp_file 目录，防止误删 ----
-    temp_path = Path(temp_dir).resolve()
-    # 目录名必须包含 "temp" 字样，且不是系统关键路径
-    if "temp" not in temp_path.name.lower():
-        logger.warning(f"目录名不包含 'temp'，出于安全考虑跳过清理: {temp_path}")
-        return {"cleaned_count": 0, "freed_bytes": 0, "errors": [], "dry_run": dry_run}
+    if temp_dirs is None:
+        temp_dirs = TEMP_DIRS
 
-    # ---- 目录不存在则创建 ----
-    if not temp_path.exists():
-        logger.info(f"临时文件目录不存在，已自动创建: {temp_path}")
-        temp_path.mkdir(parents=True, exist_ok=True)
-        return {"cleaned_count": 0, "freed_bytes": 0, "errors": [], "dry_run": dry_run}
+    total_removed = 0
+    total_skipped = 0
+    total_size = 0
 
-    now = time.time()
-    cutoff_time = now - retention_seconds
-    cleaned_count = 0
-    freed_bytes = 0
-    errors = []
+    for temp_dir in temp_dirs:
+        _removed, _skipped, _freed = _clean_one_dir(
+            temp_dir,
+            retention_seconds=retention_seconds,
+            dry_run=dry_run,
+        )
+        total_removed += _removed
+        total_skipped += _skipped
+        total_size += _freed
 
     logger.info(
-        f"开始清理临时文件 [目录={temp_path}, 保留时长={retention_seconds // 3600}h, "
-        f"截止时间戳={cutoff_time:.0f}, dry_run={dry_run}]"
+        "临时文件清理完成: 目录 %d 个, 删除 %d 个, 跳过 %d 个, 释放 %.2f MB"
+        % (len(temp_dirs), total_removed, total_skipped, total_size / 1024 / 1024)
     )
+    return {"removed": total_removed, "skipped": total_skipped, "total_size": total_size}
 
-    # ---- 遍历目录中的文件 ----
-    for entry in temp_path.iterdir():
-        # 只处理普通文件和符号链接，跳过子目录和特殊文件
-        if not entry.is_file() and not entry.is_symlink():
+
+def _clean_one_dir(
+    temp_dir: Path,
+    retention_seconds: int,
+    dry_run: bool,
+) -> tuple:
+    """清理单个临时目录"""
+    # 安全校验：目录名必须含 "temp"，防止误删其他目录
+    if "temp" not in temp_dir.name:
+        logger.warning("目录名不含 temp，跳过清理: %s", temp_dir)
+        return 0, 0, 0
+
+    # 目录不存在则创建（后续写入时无需再判断）
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    removed = 0
+    skipped = 0
+    freed = 0
+
+    for item in temp_dir.iterdir():
+        if not item.is_file():
             continue
-
         try:
-            mtime = entry.stat().st_mtime
-            if mtime < cutoff_time:
-                file_size = entry.stat().st_size
-                age_hours = (now - mtime) / 3600
-
+            mtime = item.stat().st_mtime
+            age = _now_ts() - mtime
+            if age > retention_seconds:
                 if dry_run:
-                    logger.info(f"  [DRY_RUN] 将删除: {entry.name} (大小={file_size}B, 已存在{age_hours:.1f}h)")
-                    cleaned_count += 1
-                    freed_bytes += file_size
+                    removed += 1
+                    freed += item.stat().st_size
+                    logger.debug("[dry-run] 将删除: %s", item.name)
                 else:
-                    entry.unlink()
-                    logger.info(f"  已删除: {entry.name} (大小={file_size}B, 已存在{age_hours:.1f}h)")
-                    cleaned_count += 1
-                    freed_bytes += file_size
+                    size = item.stat().st_size
+                    item.unlink()
+                    removed += 1
+                    freed += size
+                    logger.debug("已删除过期临时文件: %s", item.name)
+            else:
+                skipped += 1
+        except OSError as exc:
+            # 文件被占用或权限不足等，跳过不中断
+            skipped += 1
+            logger.debug("删除临时文件失败，跳过: %s (%s)", item.name, exc)
 
-        except PermissionError as e:
-            err_msg = f"权限不足，无法删除 {entry.name}: {e}"
-            logger.warning(err_msg)
-            errors.append(err_msg)
-        except OSError as e:
-            err_msg = f"删除 {entry.name} 失败: {e}"
-            logger.error(err_msg)
-            errors.append(err_msg)
-
-    # ---- 汇总日志 ----
-    freed_mb = freed_bytes / (1024 * 1024)
     logger.info(
-        f"临时文件清理完成: 共清理 {cleaned_count} 个文件, "
-        f"释放 {freed_mb:.2f}MB, 错误数 {len(errors)}"
+        "目录 %s: 删除 %d, 跳过 %d, 释放 %.2f KB"
+        % (temp_dir.name, removed, skipped, freed / 1024)
     )
-
-    return {
-        "cleaned_count": cleaned_count,
-        "freed_bytes": freed_bytes,
-        "errors": errors,
-        "dry_run": dry_run,
-    }
+    return removed, skipped, freed
 
 
-# ============================================================
-# 快速测试
-# ============================================================
+def _now_ts() -> float:
+    """当前时间戳（秒）"""
+    import time
+    return time.time()
+
+
 if __name__ == "__main__":
-    # 自测：试运行模式，查看会清理哪些文件
-    print("=== 临时文件清理试运行 (dry_run=True) ===")
-    result = clean_temp_files(dry_run=True)
-    print(f"将清理: {result['cleaned_count']} 个文件, 释放 {result['freed_bytes']/1024/1024:.2f}MB")
-    if result["errors"]:
-        print(f"错误: {result['errors']}")
+    # 手动执行：python -m utils.clean_task
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    result = clean_temp_files(dry_run=False)
+    print(f"清理结果: 删除 {result['removed']} 个, 跳过 {result['skipped']} 个, 释放 {result['total_size']} 字节")

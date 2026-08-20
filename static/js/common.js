@@ -84,8 +84,8 @@ function showToast(msg, type, duration) {
 const API = (() => {
     /**
      * 基础请求方法
-     * @param {string}  url     - 请求地址
-     * @param {object}  options - fetch 配置项
+     * @param {string}  url      - 请求地址
+     * @param {object}  options  - fetch 配置项
      * @returns {Promise<object>} - { ok, status, data, error }
      */
     async function request(url, options = {}) {

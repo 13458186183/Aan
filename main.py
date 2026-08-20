@@ -52,9 +52,10 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     logger.info("FieldKit 工具箱启动中...")
 
-    # 确保临时文件目录存在
+    # 确保临时文件目录存在（temp_file 通用 / temp_image 图片处理输出）
     os.makedirs("temp_file", exist_ok=True)
-    logger.info("临时文件目录 temp_file/ 已就绪")
+    os.makedirs("temp_image", exist_ok=True)
+    logger.info("临时文件目录 temp_file/、temp_image/ 已就绪")
 
     # 添加定时任务：每 1 小时执行一次临时文件清理（清理超过 24 小时的文件）
     scheduler.add_job(
@@ -94,14 +95,27 @@ app = FastAPI(
 
 # ============================================================
 # CORS 跨域配置
-# 允许前端页面（可能部署在不同端口/域名）访问后端 API
+# 同源部署时前端页面与 API 同域，一般无需跨域。
+# 如需从其他端口/域名访问，可通过环境变量 FIELDKIT_ALLOW_ORIGINS
+# 指定允许的来源（逗号分隔），默认仅放行本机地址。
 # ============================================================
+_ALLOW_ORIGINS_ENV = os.getenv("FIELDKIT_ALLOW_ORIGINS", "").strip()
+if _ALLOW_ORIGINS_ENV:
+    _cors_origins = [o.strip() for o in _ALLOW_ORIGINS_ENV.split(",") if o.strip()]
+else:
+    _cors_origins = [
+        "http://localhost",
+        "http://localhost:8000",
+        "http://127.0.0.1",
+        "http://127.0.0.1:8000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],                 # 生产环境建议限制为具体域名
-    allow_credentials=True,
-    allow_methods=["*"],                 # 允许所有 HTTP 方法
-    allow_headers=["*"],                 # 允许所有请求头
+    allow_origins=_cors_origins,
+    allow_credentials=False,                 # 不使用 Cookie 凭据，避免与跨域冲突
+    allow_methods=["*"],                     # 允许所有 HTTP 方法
+    allow_headers=["*"],                     # 允许所有请求头
     expose_headers=["Content-Disposition"],  # 前端需要读取下载文件名
 )
 
@@ -113,20 +127,24 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # ============================================================
-# 路由注册（后续分模块挂载）
+# 路由注册（分模块挂载）
 # ============================================================
 from routes.image_tool import router as image_router
-app.include_router(image_router)
 from routes.file_tool import router as file_router
-app.include_router(file_router)
 from routes.bead_tool import router as bead_router
-app.include_router(bead_router)
 from routes.attendance_tool import router as attendance_router
-app.include_router(attendance_router)
 from routes.survey_tool import router as survey_router
-app.include_router(survey_router)
 from routes.asset_tool import router as asset_router
-app.include_router(asset_router)
+
+for _router in (
+    image_router,
+    file_router,
+    bead_router,
+    attendance_router,
+    survey_router,
+    asset_router,
+):
+    app.include_router(_router)
 
 
 

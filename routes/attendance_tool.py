@@ -312,7 +312,7 @@ def _build_workbook(records: List[Dict], title: str) -> Workbook:
 # ============================================================
 
 @router.post("/roster", summary="上传并解析花名册（xlsx/csv）")
-async def parse_roster(
+def parse_roster(
     file: UploadFile = File(..., description="花名册文件（.xlsx / .csv）"),
 ):
     """
@@ -332,7 +332,7 @@ async def parse_roster(
     if not ok:
         return _error(400, msg)
 
-    content = await file.read()
+    content = file.file.read()
     people, col_map = _parse_roster(content, file.filename)
 
     # 保存解析结果，供导出接口使用
@@ -366,7 +366,7 @@ async def parse_roster(
 # ============================================================
 
 @router.post("/photos", summary="上传活动合照（辅助人工点名核对）")
-async def upload_photos(
+def upload_photos(
     files: List[UploadFile] = File(..., description="合照图片，可多张"),
 ):
     """
@@ -395,7 +395,7 @@ async def upload_photos(
             safe_name = f"photo_{uuid.uuid4().hex[:6]}"
 
         stored_name = f"{_ts()}_{uuid.uuid4().hex[:6]}_{safe_name}"
-        content = await f.read()
+        content = f.file.read()
         (PHOTO_DIR / stored_name).write_bytes(content)
 
         photo_list.append({
@@ -411,7 +411,7 @@ async def upload_photos(
 # ============================================================
 
 @router.post("/export", summary="根据点名结果导出 Excel 考勤表")
-async def export_attendance(
+def export_attendance(
     session_id: str = Form(..., description="花名册会话 ID"),
     records: str = Form(..., description="点名结果 JSON 字符串：[{name,no,dept,status,remark}]"),
     title: str = Form(default="考勤记录", description="考勤名称（默认：考勤记录）"),

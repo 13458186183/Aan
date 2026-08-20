@@ -13,7 +13,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, UnidentifiedImageError
+
+# 统一文件校验（扩展名 + 大小）
+from utils.file_check import validate_single_file
+
+# 像素炸弹防护：单张图片像素数超过上限直接报错，避免超大图拖垮内存
+Image.MAX_IMAGE_PIXELS = 50_000_000  # 约 5000 万像素
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +347,7 @@ def _rgb_to_hex(rgb: tuple) -> str:
 # ============================================================
 
 @router.post("/convert", summary="图片转拼豆像素图纸")
-async def bead_convert(
+def bead_convert(
     file: UploadFile = File(..., description="待转换的图片文件"),
     size: int = Form(52, ge=8, le=300, description="画布尺寸（正方形，8~300）"),
     num_colors: int = Form(221, ge=2, le=221, description="量化颜色数（2~221）"),
@@ -355,19 +361,25 @@ async def bead_convert(
       - "fill"（默认）：居中裁剪为正方形后拉伸填满画布
       - "fit"：保持原图比例缩放适配画布，周围留白
     """
-    # === 校验 ===
+    # === 校验（统一走 validate_single_file：扩展名白名单 + 大小限制） ===
     if not file.filename:
         return _err(400, "未选择文件")
-    if not file.content_type or not file.content_type.startswith("image/"):
-        return _err(400, "请上传图片文件（JPG / PNG / BMP / WebP 等）")
 
     try:
-        raw = await file.read()
-        if len(raw) == 0:
-            return _err(400, "文件大小为 0")
-        if len(raw) > 20 * 1024 * 1024:
-            return _err(400, "图片大小超过 20MB 限制")
+        raw = file.file.read()
+        ok, msg = validate_single_file(
+            filename=file.filename,
+            file_size=len(raw),
+            module="bead",
+            max_size_mb=20,  # 保持原有 20MB 上限
+        )
+        if not ok:
+            return _err(400, msg)
         img = Image.open(io.BytesIO(raw))
+    except Image.DecompressionBombError:
+        return _err(400, "图片像素过大（超出安全上限），请压缩后重新上传")
+    except UnidentifiedImageError:
+        return _err(400, "无法打开该图片，文件可能已损坏或不支持此格式")
     except Exception:
         return _err(400, "无法打开该图片，文件可能已损坏或不支持此格式")
 
@@ -393,7 +405,6 @@ async def bead_convert(
             top = (ih - crop_sz) // 2
             img = img.crop((left, top, left + crop_sz, top + crop_sz))
             img = img.resize((size, size), Image.NEAREST)
-        img = img.convert("RGB")
         img = img.convert("RGB")
 
         # === 2. 颜色量化 ===

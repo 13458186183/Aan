@@ -25,6 +25,9 @@ from utils.file_check import validate_single_file
 
 logger = logging.getLogger("FieldKit.SurveyTool")
 
+# 像素炸弹防护：单张图片像素数超过上限直接报错，避免超大图拖垮内存
+Image.MAX_IMAGE_PIXELS = 50_000_000  # 约 5000 万像素
+
 router = APIRouter(prefix="/api/survey", tags=["测绘 EXIF 水印"])
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -233,7 +236,7 @@ def _apply_watermark(
 # ============================================================
 
 @router.post("/watermark", summary="批量写入 EXIF 水印（GPS/时间/设备/备注）")
-async def apply_watermark(
+def apply_watermark(
     files: List[UploadFile] = File(..., description="照片文件，可多张"),
     lat: str = Form(default="", description="纬度（十进制，如 39.9042），留空不写"),
     lon: str = Form(default="", description="经度（十进制，如 116.4074），留空不写"),
@@ -287,7 +290,7 @@ async def apply_watermark(
             continue
 
         try:
-            content = await f.read()
+            content = f.file.read()
             out_bytes, summary = _apply_watermark(content, lat_f, lon_f, dt, device_s, note_s)
 
             src_name = Path(f.filename).stem or "photo"
@@ -302,10 +305,14 @@ async def apply_watermark(
                 "url": f"/api/survey/download/{out_name}",
                 **summary,
             })
-        except Exception as e:
+        except Image.DecompressionBombError:
+            logger.exception("图片像素过大: %s", f.filename)
+            fail_count += 1
+            results.append({"name": f.filename, "status": "error", "message": "图片像素过大（超出安全上限），请压缩后重新上传"})
+        except Exception:
             logger.exception("处理照片失败: %s", f.filename)
             fail_count += 1
-            results.append({"name": f.filename, "status": "error", "message": f"处理失败: {e}"})
+            results.append({"name": f.filename, "status": "error", "message": "处理失败，请检查文件是否损坏或格式是否支持"})
 
     if processed_count == 0:
         return _error(400, "所有照片处理失败，请检查文件是否损坏或格式是否支持")

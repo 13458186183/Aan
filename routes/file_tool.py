@@ -5,6 +5,7 @@
 import os
 import re
 import json
+import logging
 import shutil
 import zipfile
 from pathlib import Path
@@ -13,6 +14,8 @@ from typing import List, Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, Query, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+
+logger = logging.getLogger("FieldKit.FileTool")
 
 router = APIRouter(prefix="/api/file", tags=["文件工具箱"])
 
@@ -294,10 +297,11 @@ async def unpack_zip(
                     "download_url": f"/api/file/unzip-download/{session_dir.name}/{safe_name}",
                 })
 
-    except Exception as e:
+    except Exception:
         # 清理失败的解压目录
         shutil.rmtree(session_dir, ignore_errors=True)
-        return _error(500, f"解压过程出错: {str(e)}")
+        logger.exception("解压过程出错: %s", file.filename)
+        return _error(500, "解压过程出错，请检查压缩包是否完整")
 
     if not extracted:
         session_dir.rmdir()
